@@ -110,17 +110,23 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .actions { display: flex; gap: 6px; padding: 0 10px; }
 .actions .btn { flex: 1; padding: 6px 4px; min-height: 36px; font-size: 12px; }
 
-.card { flex: 0 0 132px; height: 168px; border-radius: 10px; background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1.5px solid var(--line); position: relative; overflow: hidden; padding: 0; text-align: left; cursor: pointer; scroll-snap-align: start; display: flex; flex-direction: column; }
+.card { flex: 0 0 132px; height: 176px; border-radius: 10px; background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1.5px solid var(--line); position: relative; overflow: hidden; padding: 0; text-align: left; cursor: pointer; scroll-snap-align: start; display: flex; flex-direction: column; }
 .card.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--accent), 0 8px 26px -8px var(--accent); transform: translateY(-4px); }
-.card .band { height: 24px; background: var(--cc); color: #071018; display: flex; align-items: center; gap: 4px; padding: 0 6px; font-weight: 700; font-size: 11px; }
-.card .band .gem { margin-left: auto; width: 10px; height: 10px; transform: rotate(45deg); border: 1.5px solid #071018; }
-.card .nm { font-family: var(--head); font-weight: 700; font-size: 13px; line-height: 1.1; padding: 4px 6px 2px; }
+.card .art { position: relative; flex: none; height: 58px; border-top: 3px solid var(--cc); background: radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--cc) 35%, transparent), transparent 70%), #0a0e18; display: flex; flex-direction: column; justify-content: space-between; }
+.card .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.card .art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #0008 0%, transparent 32%, transparent 48%, var(--panel2) 100%); pointer-events: none; }
+.card .band { position: relative; z-index: 1; display: flex; align-items: center; padding: 4px 5px 0; }
+.card .band .chip { background: var(--cc); color: #071018; font-weight: 700; font-size: 10px; line-height: 1; padding: 3px 5px; border-radius: 5px; white-space: nowrap; }
+.card .band .gem { margin-left: auto; width: 10px; height: 10px; transform: rotate(45deg); border: 1.5px solid #071018; box-shadow: 0 0 0 1px #fff6; }
+.card .nm { position: relative; z-index: 1; font-family: var(--head); font-weight: 700; font-size: 13px; line-height: 1.1; padding: 0 6px 3px; text-shadow: 0 1px 2px #000, 0 0 8px #000c; }
 .card .meta { font-size: 10px; color: var(--dim); padding: 0 6px; }
 .card .tx { font-size: 10.5px; line-height: 1.25; color: #c9d2e3; padding: 3px 6px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
 .card .rar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
 .card.big { flex: none; width: 100%; height: auto; cursor: default; }
 .card.big .tx { -webkit-line-clamp: unset; font-size: 13px; }
-.card.big .nm { font-size: 17px; }
+.card.big .nm { font-size: 17px; padding-bottom: 6px; }
+.card.big .art { height: auto; aspect-ratio: 16 / 10; }
+.card.big .band .chip { font-size: 12px; padding: 4px 7px; }
 
 /* ---------- sheets */
 .overlay { position: fixed; inset: 0; background: #0009; z-index: 20; display: flex; align-items: flex-end; justify-content: center; animation: fade .15s; }
@@ -188,6 +194,7 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .charter.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
 @media (min-width: 560px) {
-  .card { flex-basis: 150px; height: 180px; }
+  .card { flex-basis: 150px; height: 190px; }
+  .card .art { height: 64px; }
   .clan-grid { grid-template-columns: 1fr 1fr 1fr; }
 }

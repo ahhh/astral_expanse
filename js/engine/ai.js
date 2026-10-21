@@ -2,7 +2,8 @@
 // in-game "Suggest" button. It tries every card in hand on (a sample of)
 // legal hexes, simulates this turn plus `look` quiet turns, and keeps the
 // placement with the best Influence gain (Integrity losses are penalized).
-import { legalHexes, forecast, abilityState, abilityTargets, useAbility, clone, bldList, passTurn } from './colony.js';
+import { legalHexes, forecast, abilityState, abilityTargets, useAbility, clone, bldList, passTurn, digHexes, digTurn, bldAt } from './colony.js';
+import * as H from './hex.js';
 
 export function bestMove(S, opt = {}) {
   const look = opt.look ?? 2;
@@ -43,4 +44,12 @@ export function tryAbilities(S) {
     }
     if (best && best.g >= 10) useAbility(S, b.id, best.k);
   }
+}
+
+// With nothing worth building, dig the Rock hex touching the most buildings
+// (opening space next to the engine), or pass when nothing can be dug.
+export function idleTurn(S) {
+  const k = digHexes(S).map((x) => [x, H.near(S.R, x, 1).filter((n) => bldAt(S, n)).length]).sort((a, b) => b[1] - a[1])[0];
+  if (k) digTurn(S, k[0]);
+  else passTurn(S);
 }

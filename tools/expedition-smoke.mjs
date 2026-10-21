@@ -4,8 +4,8 @@
 //
 //   node tools/expedition-smoke.mjs [runs=3] [difficulty=standard]
 import * as X from '../js/engine/expedition.js';
-import { playCard, passTurn, chooseTech } from '../js/engine/colony.js';
-import { bestMove, tryAbilities } from '../js/engine/ai.js';
+import { playCard, chooseTech } from '../js/engine/colony.js';
+import { bestMove, tryAbilities, idleTurn } from '../js/engine/ai.js';
 import { CLAN_IDS } from '../js/engine/cards.js';
 
 const runs = Number(process.argv[2] || 3);
@@ -18,7 +18,7 @@ function playColony(S) {
     if (S.techOffer) chooseTech(S, S.techOffer[0]);
     tryAbilities(S);
     const m = bestMove(S, { maxHexes: 18, look: 1 });
-    if (m) playCard(S, m.i, m.k); else passTurn(S);
+    if (m) playCard(S, m.i, m.k); else idleTurn(S);
   }
 }
 

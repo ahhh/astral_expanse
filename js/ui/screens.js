@@ -161,6 +161,7 @@ export function helpScreen(root, { onBack }) {
     h('div', { class: 'page' },
       h('h3', null, 'The colony map'),
       P('Each turn you build one card from your hand on an empty hex. Tap a card to see every legal hex with a forecast of the Influence it would earn (the best three glow gold). Tap a hex to confirm. Tap a card again for its full text. Misplaced something? Undo (if your difficulty allows it) rewinds the last placement.'),
+      P('Instead of building, you can spend the turn on the land itself: tap a Rock hex next to open ground and ⛏ Excavate it into a Cavern, or tap one of your buildings and 💥 Demolish it to free its hex. Both trigger nearby reactions as usual, and you still draw normally.'),
       P('Buildings fire on triggers: On Build, every turn, every N turns, while Sunlit, or reactively when something happens nearby – a resource is created, consumed or transformed, a hex heats or cools, a meteor lands, and so on. One placement can set off a long cascade. Each building can activate at most twice per turn.'),
       P('The asteroid rotates one quarter-turn each turn: the compass shows where the sun is. Lit hexes are brighter, Shadow hexes darker. Caverns (excavated rock) are always in Shadow.'),
       P('Natural deposits hold several units (shown as ×3, ×2). Converting one places the product on a free neighbouring hex, so keep space around your deposits.'),

@@ -53,7 +53,7 @@ export function canPlace(S, cid, k) {
   const h = S.hexes[k];
   const c = CARDS[cid];
   if (!h || h.b) return false;
-  if (h.res && !h.hid) return false;
+  if (h.res && !h.hid && !(S.stripLeft > 0)) return false;
   if (h.kind === 'orbit') return c.tags.includes('Orbit') || c.tags.includes('Orbital');
   return h.kind === 'surface' || h.kind === 'cavern';
 }
@@ -206,7 +206,8 @@ export function activate(S, b, ev, o = {}) {
   }
   if (!ctx.did && ctx.pts <= 0) { b.acts--; return false; }
   const aura = ctx.pts > 0 ? auraBonus(S, b) : 0;
-  const total = ctx.pts + aura;
+  const oc = ctx.pts > 0 ? (hasTech(S, 'overclock') && b.acts >= 2 ? 2 : 0) + (hasTech(S, 'shieldgrid') && H.dist(b.k, '0,0') === 1 ? 1 : 0) : 0;
+  const total = ctx.pts + aura + oc;
   S.influence += total;
   b.inf += ctx.pts;
   if (o.isBuild) b.ib = (b.ib || 0) + ctx.pts;
@@ -720,7 +721,7 @@ function dealDraws(S, n) {
     const id = drawOne(S);
     if (!id) continue;
     if (S.hand.length < HAND_MAX) S.hand.push(id);
-    else { S.influence += 1; note(S, `Hand full – ${CARDS[id].n} scrapped (+1)`); }
+    else { const v = hasTech(S, 'drone') ? 2 : 1; S.influence += v; note(S, `Hand full – ${CARDS[id].n} scrapped (+${v})`); }
   }
 }
 
@@ -741,7 +742,8 @@ export function playCard(S, handIdx, k) {
   S.hand.splice(handIdx, 1);
   const c = CARDS[cid];
   const h = S.hexes[k];
-  if (h.res && h.hid) { h.res = null; h.hid = false; }
+  if (h.res && !h.hid) { S.stripLeft--; note(S, `🛰️ Built over ${h.res} (${S.stripLeft} left)`, k); }
+  if (h.res) { h.res = null; h.hid = false; }
   const id = S.nextId++;
   const b = { id, c: cid, k, clan: c.cl, acts: 0, age: 0, sun: 0, mem: {}, placed: S.turn, inf: 0, dis: 0 };
   S.blds[id] = b;
@@ -761,6 +763,34 @@ export function passTurn(S) {
   if (S.status !== 'play') return;
   S._q = [];
   endTurn(S);
+}
+
+// Instead of building, spend the turn digging a Rock hex next to open ground
+// into a Cavern, or demolishing one of your buildings to free its hex.
+export const digHexes = (S) => H.shape(S.R).land.filter((k) => S.hexes[k].kind === 'rock' && H.near(S.R, k, 1).some((n) => S.hexes[n] && (S.hexes[n].kind === 'surface' || S.hexes[n].kind === 'cavern')));
+export const demolishHexes = (S) => bldList(S).filter((b) => b.c !== 'beacon').map((b) => b.k);
+export function digTurn(S, k) {
+  if (S.status !== 'play' || !digHexes(S).includes(k)) return false;
+  const h = S.hexes[k];
+  S._q = [];
+  h.kind = 'cavern';
+  h.hid = false;
+  S.stats.excavated++;
+  note(S, '⛏ Excavated a Cavern', k);
+  emit(S, { type: 'excavate', k, src: null });
+  if (h.res) emit(S, { type: 'reveal', k, res: h.res, src: null });
+  processQueue(S);
+  endTurn(S);
+  return true;
+}
+export function demolishTurn(S, k) {
+  const b = bldAt(S, k);
+  if (S.status !== 'play' || !b || b.c === 'beacon') return false;
+  S._q = [];
+  destroyBuilding(S, b, null);
+  processQueue(S);
+  endTurn(S);
+  return true;
 }
 
 export function scrapCard(S, handIdx) {
@@ -890,13 +920,13 @@ export function drawsFor(S, clansNow) {
 // ---------------------------------------------------------------- local technologies
 // Offered at each met (non-final) checkpoint; they last for this map only.
 export const TECHS = {
-  echo: { n: 'Activation Echo', ic: '🔁', d: 'Once per era, at the end of a turn, your highest-earning building activates again.' },
-  survey: { n: 'Field Survey', ic: '🛰️', d: 'Reveal every buried surface deposit now and draw 1 extra card next turn.' },
-  weave: { n: 'Structural Weave', ic: '🧱', d: '+3 Integrity and +3 maximum Integrity.' },
-  shieldgrid: { n: 'Shield Grid', ic: '🛡️', d: 'Every hex within range 2 of the Charter Beacon counts as Shielded.' },
-  overclock: { n: 'Overclock', ic: '⚡', d: 'Every building may activate one extra time per turn.' },
-  drone: { n: 'Supply Drones', ic: '📦', d: 'Draw 1 extra card every turn.' },
-  resonance: { n: 'Clan Resonance', ic: '🎼', d: 'At the end of each turn, +2 Influence per clan that activated.' },
+  echo: { n: 'Activation Echo', ic: '🔁', d: 'At the end of each turn, your highest-earning building activates again.' },
+  survey: { n: 'Field Survey', ic: '🛰️', d: 'Reveal every buried surface deposit. Up to 4 times this map, you may build on top of a deposit, clearing it.' },
+  weave: { n: 'Structural Weave', ic: '🧱', d: '+3 Integrity and +3 maximum Integrity. At the end of each turn, +1 Influence per 5 Integrity you have.' },
+  shieldgrid: { n: 'Shield Grid', ic: '🛡️', d: 'Every hex within range 2 of the Charter Beacon counts as Shielded, and buildings next to the Beacon score +1 per activation.' },
+  overclock: { n: 'Overclock', ic: '⚡', d: 'Every building may activate one extra time per turn, and its second and later activations each turn score +2.' },
+  drone: { n: 'Supply Drones', ic: '📦', d: 'Draw 1 extra card every turn. Cards that overflow your hand score +2 instead of +1.' },
+  resonance: { n: 'Clan Resonance', ic: '🎼', d: 'At the end of each turn, +1 Influence per clan that activated, +1 more if all three did.' },
 };
 export const hasTech = (S, id) => !!(S.techs && S.techs.includes(id));
 function offerTech(S) {
@@ -913,22 +943,27 @@ export function chooseTech(S, id) {
   if (id === 'weave') { S.integrity += 3; S.maxIntegrity += 3; }
   if (id === 'survey') {
     for (const k of H.shape(S.R).land) if (S.hexes[k].kind !== 'rock') S.hexes[k].hid = false;
-    S.bonusDraw++;
+    S.stripLeft = 4;
   }
   return true;
 }
 function techStep(S) {
-  if (hasTech(S, 'echo') && S.echoEra !== era(S)) {
+  if (hasTech(S, 'echo')) {
     const best = bldList(S).filter((b) => b.c !== 'beacon' && canRepeatCard(card(b)) && !blocked(S, b)).sort((a, b) => b.inf - a.inf)[0];
     if (best) {
-      S.echoEra = era(S);
       activate(S, best, null, { repeat: true, extra: true, fn: card(best).run || card(best).build });
       processQueue(S);
     }
   }
+  if (hasTech(S, 'weave') && S.integrity >= 5) {
+    const v = Math.floor(S.integrity / 5);
+    S.influence += v;
+    note(S, `🧱 Structural Weave +${v}`);
+  }
   if (hasTech(S, 'resonance')) {
     const n = Object.keys(S.tstat.clans).filter((c) => S.clans.includes(c)).length;
-    if (n) { S.influence += 2 * n; note(S, `🎼 Clan Resonance +${2 * n}`); }
+    const v = n + (n >= 3 ? 1 : 0);
+    if (v) { S.influence += v; note(S, `🎼 Clan Resonance +${v}`); }
   }
 }
 

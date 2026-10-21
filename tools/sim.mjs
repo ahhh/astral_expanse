@@ -10,8 +10,8 @@ import { cpus } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { CLAN_IDS, CLANS, CARD_LIST, RARITY } from '../js/engine/cards.js';
 import { genColony } from '../js/engine/mapgen.js';
-import { playCard, passTurn, bldList } from '../js/engine/colony.js';
-import { bestMove, tryAbilities } from '../js/engine/ai.js';
+import { playCard, bldList } from '../js/engine/colony.js';
+import { bestMove, tryAbilities, idleTurn } from '../js/engine/ai.js';
 import { rubric } from '../js/engine/rubric.js';
 
 export const PROFILES = [
@@ -29,7 +29,7 @@ function playGame(clans, seed, profile, look) {
     tryAbilities(S);
     const m = bestMove(S, { maxHexes: 22, look });
     if (m) playCard(S, m.i, m.k);
-    else passTurn(S);
+    else idleTurn(S);
   }
   const blds = bldList(S).filter((b) => b.c !== 'beacon').map((b) => ({ c: b.c, inf: b.inf, ib: b.ib || 0, na: b.na || 0, turns: S.turn - b.placed + 1, placed: b.placed }));
   return { clans, status: S.status, influence: S.influence, cps: S.checkpoints.map((c) => [c.need, c.met, c.at ?? S.influence]), cpInf: S.cpInf || [], blds, destroyed: S.stats.destroyed, integrity: S.integrity };

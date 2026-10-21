@@ -5,7 +5,7 @@ import { CARDS, CLANS, RARITY, TIER } from '../engine/cards.js';
 import { RES, STATUS, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import * as HX from '../engine/hex.js';
 import {
-  isLit, legalHexes, forecast, playCard, passTurn, scrapCard, bldAt, bldList, network, links,
+  isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, scrapCard, bldAt, bldList, network, links,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
   SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone,
 } from '../engine/colony.js';
@@ -34,9 +34,9 @@ export function colonyScreen(root, S, hooks) {
   root.innerHTML = '';
   const hud = h('div', { class: 'hud' });
   const svgEl = s('svg', { role: 'img', 'aria-label': 'Colony map' });
-  // Optional backdrop art for this planet type (art/maps/<type>.webp); absent files just vanish.
-  const backdrop = h('img', { class: 'backdrop', alt: '', src: mapBackdrop(S.boss ? S.boss.type : S.type), onerror: (e) => e.target.remove() });
-  const mapwrap = h('div', { class: 'mapwrap' }, backdrop, svgEl);
+  // Optional planet art for this planet type (art/maps/<type>.webp), drawn as a globe under the land hexes.
+  const backdropSrc = mapBackdrop(S.boss ? S.boss.type : S.type);
+  const mapwrap = h('div', { class: 'mapwrap' }, svgEl);
   const handEl = h('div', { class: 'hand' });
   const actEl = h('div', { class: 'actions' });
   const tray = h('div', { class: 'tray' }, handEl, actEl);
@@ -169,6 +169,20 @@ export function colonyScreen(root, S, hooks) {
       s('pattern', { id: 'rockpat', width: 2.6, height: 2.6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(40)' },
         s('rect', { width: 2.6, height: 2.6, fill: '#10141e' }), s('line', { x1: 0, y1: 0, x2: 0, y2: 2.6, stroke: '#262f42', 'stroke-width': 1 })));
     const gBase = s('g'), gNet = s('g', { 'pointer-events': 'none' }), gTop = s('g');
+    // The planet globe: sized to the land hexes so the orbital ring sits just outside it.
+    const PR = ORBIT_R - SZ * 0.95;
+    defs.append(
+      s('clipPath', { id: 'planetclip' }, s('circle', { cx: 0, cy: 0, r: PR })),
+      s('radialGradient', { id: 'planetshade', cx: '38%', cy: '34%', r: '70%' },
+        s('stop', { offset: '0%', 'stop-color': '#fff', 'stop-opacity': 0.06 }),
+        s('stop', { offset: '65%', 'stop-color': '#000', 'stop-opacity': 0.15 }),
+        s('stop', { offset: '100%', 'stop-color': '#000', 'stop-opacity': 0.6 })));
+    if (!isMissing(backdropSrc)) {
+      const im = s('image', { href: backdropSrc, x: -PR, y: -PR, width: 2 * PR, height: 2 * PR, preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#planetclip)', class: 'planet-bg', 'pointer-events': 'none' });
+      im.addEventListener('error', () => { markMissing(backdropSrc); im.remove(); });
+      gBase.append(im);
+    }
+    gBase.append(s('circle', { cx: 0, cy: 0, r: PR, fill: 'url(#planetshade)', stroke: '#8fb4ff', 'stroke-width': 0.4, 'stroke-opacity': 0.35, 'pointer-events': 'none' }));
     // The orbital ring: every orbital slot shares one network.
     gBase.append(s('circle', { cx: 0, cy: 0, r: ORBIT_R, fill: 'none', stroke: '#4a6aa8', 'stroke-width': 0.5, 'stroke-dasharray': '1.5 2', opacity: 0.6, 'pointer-events': 'none' }));
     for (const k of keys) {
@@ -551,7 +565,21 @@ export function colonyScreen(root, S, hooks) {
         body.append(h('p', null, 'Clans connected to the Beacon: ', S.clans.map((c) => h('span', { class: 'chip', style: { color: cl.has(c) ? CLANS[c].col : 'var(--faint)' } }, CLANS[c].ic, cl.has(c) ? ' ✓' : ' ✗'))));
       }
     }
+    const busy = S.status !== 'play';
+    if (b && b.c !== 'beacon') actions.push({ label: '💥 Demolish (uses turn)', cls: 'danger', disabled: busy, on: () => confirmSheet(`Demolish ${CARDS[b.c].n}?`, 'Spend this turn tearing it down instead of building. The hex becomes free; the environment still advances and you draw normally.', 'Demolish', () => turnAction(() => demolishTurn(S, k))) });
+    if (digHexes(S).includes(k)) actions.push({ label: '⛏ Excavate (uses turn)', cls: 'primary', disabled: busy, on: () => turnAction(() => digTurn(S, k)) });
+    else if (hx.kind === 'rock') body.append(h('p', { class: 'faint' }, 'Dig from open ground: only Rock next to Surface or a Cavern can be excavated.'));
     sheet({ title: b ? CARDS[b.c].n : `${KIND[hx.kind]} ${k}`, body, actions });
+  }
+
+  // Spend the whole turn on a non-card action (excavate, demolish).
+  function turnAction(fn) {
+    const seq = S.seq, before = S.influence, turn = S.turn;
+    const prior = { state: clone(S), turn };
+    if (!fn()) return;
+    snap = prior;
+    sel = null; fc = null; abil = null;
+    after(seq, false, before, turn);
   }
 
   function feedLine(e) {

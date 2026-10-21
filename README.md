@@ -54,10 +54,11 @@ Each colony is a hex asteroid that you build up one card per turn.
 
 1. **Tap a card** in your hand. Every legal hex shows a forecast of the Influence it would earn, and the best three glow gold. Tap a hex, check the expected chain reaction, then press **Build here**. **💡 Hint** suggests a move. **↶ Undo** rewinds a misplaced building (if your difficulty allows it).
 2. **Chain reactions are the point.** Buildings fire On Build, on timers, while Sunlit, or in reaction to nearby events: a resource being created, consumed or melted, a hex heating up, a meteor landing, and so on. One well-placed card can set off a whole district. Each building activates at most twice per turn.
-3. **Mind the light.** The asteroid turns a quarter each turn (see the sun compass). Solar buildings want Sunlit hexes and Cryo buildings want Shadow.
-4. **Hit the checkpoints.** Every 5 turns you must reach an Influence target. Missing one costs 3 Integrity, and missing the final one fails the colony. Each checkpoint you meet (except the last) offers a **🔬 local technology** for the rest of that map, for example Overclock, Shield Grid or Supply Drones.
-5. **Go for mega-projects.** **🎯 Goals** tracks six arrangements, such as *Artificial Dawn* (Solar + Power network) and *Deep Biosphere* (connected Bio buildings on Pressurized ground). Completing one scores +12 and grants a lasting perk.
-6. **Draws.** You draw 1 card per turn, +1 if two of your clans activated last turn (or your only clan did), and +1 more if all three did.
+3. **Spend a turn on the land.** Instead of building, tap a Rock hex next to open ground and **⛏ Excavate** it into a Cavern, or tap one of your buildings and **💥 Demolish** it to free the hex. Either uses your turn, triggers nearby reactions (excavate or destroy listeners) and you still draw normally.
+4. **Mind the light.** The asteroid turns a quarter each turn (see the sun compass). Solar buildings want Sunlit hexes and Cryo buildings want Shadow.
+5. **Hit the checkpoints.** Every 5 turns you must reach an Influence target. Missing one costs 3 Integrity, and missing the final one fails the colony. Each checkpoint you meet (except the last) offers a **🔬 local technology** for the rest of that map, for example Overclock, Shield Grid or Supply Drones.
+6. **Go for mega-projects.** **🎯 Goals** tracks six arrangements, such as *Artificial Dawn* (Solar + Power network) and *Deep Biosphere* (connected Bio buildings on Pressurized ground). Completing one scores +12 and grants a lasting perk.
+7. **Draws.** You draw 1 card per turn, +1 if two of your clans activated last turn (or your only clan did), and +1 more if all three did.
 
 ### 4. Claim a charter
 

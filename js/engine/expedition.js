@@ -101,7 +101,8 @@ function growChart(o, chart, prev, first, count, enclaveClans, bossList) {
   };
   const layers = [prev];
   for (let L = first; L < first + count; L++) {
-    const n = L === 1 ? 3 : 3 + (rnd(o) < 0.35 ? 1 : 0);
+    // The layer before the Crown has one node per boss, each its sole approach.
+    const n = L === first + count - 1 ? bossList.length : L === 1 ? 3 : 3 + (rnd(o) < 0.35 ? 1 : 0);
     const ids = [];
     for (let i = 0; i < n; i++) {
       const id = nodes.length;
@@ -136,7 +137,7 @@ function growChart(o, chart, prev, first, count, enclaveClans, bossList) {
     if (i >= 1) for (let j = 0; j + 1 < cur.length; j++) if (rnd(o) < 0.45) edges.push({ a: cur[j], b: cur[j + 1], len: 1, lateral: true });
   }
   const last = layers[layers.length - 1];
-  for (const a of last) for (const b of bossIds) edges.push({ a, b, len: 3, final: true });
+  last.forEach((a, i) => edges.push({ a, b: bossIds[i], len: 3, final: true }));
   for (let i = 0; i + 1 < last.length; i++) if (rnd(o) < 0.45) edges.push({ a: last[i], b: last[i + 1], len: 1, lateral: true });
 
   // Node types. Enclaves come early and often so a lone clan can grow its treaty.

@@ -83,7 +83,7 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .hud .cp { font-size: 12px; color: var(--dim); }
 .mapwrap { flex: 1; position: relative; min-height: 0; touch-action: manipulation; }
 .mapwrap svg { width: 100%; height: 100%; display: block; }
-.hex-base { stroke: #0b0f1a; stroke-width: .6; }
+.hex-base { stroke: #0b0f1a; stroke-width: .6; fill-opacity: .72; }
 .hex-hit { fill: transparent; cursor: pointer; }
 .legal { fill: #6ee7ff22; stroke: #6ee7ffaa; stroke-width: .9; pointer-events: none; }
 .legal.top { fill: #ffbf3c33; stroke: #ffbf3c; stroke-width: 1.4; }
@@ -230,8 +230,8 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .techs { display: flex; gap: 4px; flex-wrap: wrap; }
 /* Colony map: backdrop, controls, key */
 .mapwrap svg { touch-action: none; position: relative; }
-/* Backdrops are muted (desaturated, dimmed, softened) so they read as scenery, never as map state. */
-.mapwrap .backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .38; filter: saturate(.45) brightness(.6) contrast(.85) blur(1.5px); transform: scale(1.03); pointer-events: none; }
+/* The planet globe is muted (desaturated, dimmed, softened) so it reads as scenery, never as map state. */
+.mapwrap .planet-bg { opacity: .5; filter: saturate(.55) brightness(.7) contrast(.9) blur(.4px); }
 .mapctl { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
 .mapbtn { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: #0d1220e0; color: var(--text); font: 700 16px/1 var(--head); display: grid; place-items: center; padding: 0; cursor: pointer; }
 .mapbtn.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }

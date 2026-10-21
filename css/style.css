@@ -244,3 +244,8 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .node-c image { filter: drop-shadow(0 0 3px #0008); }
 .node-c image.fog { opacity: .8; }
 .planet-hero { display: block; width: 96px; height: 96px; margin: 0 auto 6px; filter: drop-shadow(0 4px 14px #0009); }
+
+/* ---------- tooltip */
+.tip { position: fixed; z-index: 50; max-width: 230px; padding: 7px 9px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); box-shadow: 0 6px 18px #0008; font-size: 12px; line-height: 1.35; pointer-events: none; }
+.tip b { display: block; margin-bottom: 2px; }
+.res .chip { cursor: help; }

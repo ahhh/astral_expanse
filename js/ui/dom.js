@@ -73,3 +73,27 @@ export function toast(msg) {
 export function confirmSheet(title, text, yes, onYes) {
   sheet({ title, body: h('p', null, text), actions: [{ label: 'Cancel' }, { label: yes, cls: 'danger', on: onYes }] });
 }
+
+// Small floating tooltip: hover on mouse, tap to toggle on touch. One shared bubble.
+let tipEl = null, tipFor = null;
+function hideTip() {
+  if (tipEl) tipEl.remove();
+  tipEl = tipFor = null;
+}
+function showTip(anchor, content) {
+  hideTip();
+  tipFor = anchor;
+  tipEl = h('div', { class: 'tip', role: 'tooltip' }, content);
+  document.body.append(tipEl);
+  const r = anchor.getBoundingClientRect(), w = tipEl.offsetWidth;
+  tipEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+  tipEl.style.top = r.bottom + 6 + 'px';
+}
+document.addEventListener('pointerdown', (e) => { if (tipFor && !tipFor.contains(e.target)) hideTip(); }, true);
+addEventListener('scroll', hideTip, true);
+export function withTip(el, content) {
+  el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') showTip(el, content); });
+  el.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && tipFor === el) hideTip(); });
+  el.addEventListener('click', (e) => e.pointerType !== 'mouse' && (tipFor === el && tipEl ? hideTip() : showTip(el, content)));
+  return el;
+}

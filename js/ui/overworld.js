@@ -1,5 +1,5 @@
 // Star chart and between-colony screens.
-import { h, s, sheet, toast, closeSheets } from './dom.js';
+import { h, s, sheet, toast, closeSheets, withTip } from './dom.js';
 import { cardEl, cardText, trigLabel } from './cardview.js';
 import { CARDS, CLANS, RARITY, TIER, clanCards } from '../engine/cards.js';
 import { WORLD, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
@@ -10,8 +10,18 @@ import { planetIcon, isMissing, markMissing } from './art.js';
 const RES_ORDER = ['CR', 'AL', 'CY', 'GE', 'DA', 'GS'];
 const TABS = [['chart', '🗺️', 'Chart'], ['net', '🛰️', 'Network'], ['dir', '🏛️', 'Clans'], ['foundry', '🔧', 'Foundry'], ['fleet', '🚀', 'Fleet'], ['goals', '🎯', 'Goals']];
 
+const RES_TIPS = {
+  CR: 'Pays for Foundry, clan politics, lanes and trade. Earned from Mint and Trade colonies, Derelicts and selling at Freeports.',
+  AL: 'Builds supply lanes, fleet upgrades and rescues. Earned from Foundry Works colonies, Derelicts and Freeport trade.',
+  CY: 'Jump fuel. Running short means a tow (+Pressure). Earned from Cryogenic Depot colonies and Freeport trade.',
+  GE: 'Bio preparations and some Foundry blueprints. Earned from Gene Ark colonies and the Living Circuit compact.',
+  DA: 'Research, clan diplomacy and survey gear. Earned from Star Observatory colonies and Observatory nodes.',
+  GS: 'Bring 3 to the Veil; each one missing makes the final world harder. Earned by securing Gate Shrines.',
+};
 export function resBar(E) {
-  return h('div', { class: 'res' }, RES_ORDER.map((r) => h('span', { class: 'chip', title: WORLD[r].n }, WORLD[r].ic, ' ', E.res[r], ' ', h('span', { class: 'faint' }, r))));
+  return h('div', { class: 'res' }, RES_ORDER.map((r) => withTip(
+    h('span', { class: 'chip', 'aria-label': WORLD[r].n }, WORLD[r].ic, ' ', E.res[r], ' ', h('span', { class: 'faint' }, r)),
+    [h('b', null, `${WORLD[r].ic} ${WORLD[r].n}`), RES_TIPS[r]])));
 }
 function pips(n) {
   return h('span', { class: 'pips' }, [0, 1, 2, 3, 4].map((i) => h('i', { class: i < n ? 'on' : '' })));

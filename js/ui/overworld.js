@@ -1,6 +1,6 @@
 // Star chart and between-colony screens.
 import { h, s, sheet, toast, confirmSheet, closeSheets } from './dom.js';
-import { cardEl, clanColor, trigLabel } from './cardview.js';
+import { cardEl, cardText, clanColor, trigLabel } from './cardview.js';
 import { CARDS, CLANS, RARITY, TIER, clanCards } from '../engine/cards.js';
 import { WORLD, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import { rubric } from '../engine/rubric.js';
@@ -173,7 +173,7 @@ function directorate(body, E, hooks) {
         const fv = E.dir.fav[c.id] || 1;
         const w = banned ? 0 : RARITY[c.r].w * fv;
         return h('div', { class: 'item codex-card' },
-          h('div', null, h('b', null, c.n), ' ', h('span', { class: 'pill-' + c.r }, RARITY[c.r].n), h('div', { class: 'faint', style: { fontSize: '11px' } }, `${TIER[c.t]} · ${trigLabel(c)} · ${((w / totW) * 100).toFixed(0)}% of ${CLANS[cl].n.split(' ')[0]} draws`), h('div', { class: 'dim', style: { fontSize: '12px' } }, c.text)),
+          h('div', null, h('b', null, c.n), ' ', h('span', { class: 'pill-' + c.r }, RARITY[c.r].n), h('div', { class: 'faint', style: { fontSize: '11px' } }, `${TIER[c.t]} · ${trigLabel(c)} · ${((w / totW) * 100).toFixed(0)}% of ${CLANS[cl].n.split(' ')[0]} draws`), h('div', { class: 'tx dim', style: { fontSize: '12px' } }, cardText(c.text))),
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
             h('span', { class: 'pp pill-' + c.r }, rubric(c).pp + ' PP'),
             banned ? h('button', { class: 'btn small', disabled: !X.canAfford(E, X.DIR_COST.restore), onclick: act(() => X.restore(E, c.id)) }, 'Restore')

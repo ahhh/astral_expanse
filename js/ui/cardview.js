@@ -18,6 +18,34 @@ export function abbr(c) {
   return (w.length > 1 ? w[0][0] + w[1][0] : w[0].slice(0, 2)).toUpperCase();
 }
 
+// Card text as one row per trigger ("Every 2 turns", "Reactive", ...) with point gains highlighted.
+const HEAD = /^(Link(?: \(reach \d\))?)\.\s*|^([A-Z][A-Za-z0-9 ()+-]{1,40}?):\s*/;
+const CONT = /^(Otherwise|Without|With|If|Once|The first|Irradiates|\+)/;
+const PTS = /(?:min |max )?\+\d+(?! range)(?: (?:each|more))?(?:( (?:more )?per [^.;()+]+?) \(max (\d+)\))?/g;
+function ptsEl(seg) {
+  const out = [];
+  let i = 0;
+  for (const m of seg.matchAll(PTS)) {
+    out.push(seg.slice(i, m.index));
+    // A count cap reads better as the points it is worth: "+2 per X (max 3)" -> "+2 per X (up to +6)".
+    const txt = m[2] ? `${m[0].slice(0, m[0].indexOf(' (max'))} (up to +${parseInt(m[0].slice(1), 10) * +m[2]})` : m[0];
+    out.push(h('b', { class: 'pts' }, txt));
+    i = m.index + m[0].length;
+  }
+  out.push(seg.slice(i));
+  return out;
+}
+export function cardText(text) {
+  const rows = [];
+  for (const s of text.split(/(?<=\.)\s+(?=[A-Z+])/)) {
+    const m = s.match(HEAD);
+    if (m) rows.push({ lbl: m[1] || m[2], body: s.slice(m[0].length) });
+    else if (rows.length && (CONT.test(s) || !rows[rows.length - 1].body)) rows[rows.length - 1].body += ' ' + s;
+    else rows.push({ lbl: 'Passive', body: s });
+  }
+  return rows.map((r) => h('div', { class: 'tl' }, h('span', { class: 'trg' }, r.lbl), ' ', ptsEl(r.body)));
+}
+
 export function cardEl(cid, opts = {}) {
   const c = CARDS[cid];
   const cl = CLANS[c.cl] || { n: 'Neutral', ic: '★' };
@@ -33,7 +61,7 @@ export function cardEl(cid, opts = {}) {
     h('div', { class: 'nm' }, c.n)),
   h('div', { class: 'meta' }, `${TIER[c.t]} · `, h('span', { class: 'pill-' + c.r }, RARITY[c.r].n), ` · ${trigLabel(c)}`),
   h('div', { style: { padding: '2px 6px 0' } }, c.tags.map((t) => h('span', { class: 'tag' }, t))),
-  h('div', { class: 'tx' }, c.text),
+  h('div', { class: 'tx' }, cardText(c.text)),
   opts.big && c.cl !== 'neutral' ? h('div', { class: 'meta', style: { padding: '6px 6px 8px' } }, `Rubric power `, h('b', { class: 'pp pill-' + c.r }, rubric(c).pp), ` PP · measured ${MEASURED[c.id] ?? '–'} PP`) : null,
   h('div', { class: 'rar', style: { background: RARITY[c.r].col } }));
 }

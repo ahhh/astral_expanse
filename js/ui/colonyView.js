@@ -1,6 +1,6 @@
 // Colony map screen: HUD, SVG hex map, hand tray and info sheets.
 import { h, s, sheet, toast, confirmSheet, closeSheets } from './dom.js';
-import { cardEl, clanColor, abbr, trigLabel } from './cardview.js';
+import { cardEl, cardText, clanColor, abbr, trigLabel } from './cardview.js';
 import { CARDS, CLANS, RARITY, TIER } from '../engine/cards.js';
 import { RES, STATUS, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import * as HX from '../engine/hex.js';
@@ -28,6 +28,9 @@ export function colonyScreen(root, S, hooks) {
   const handEl = h('div', { class: 'hand' });
   const actEl = h('div', { class: 'actions' });
   const tray = h('div', { class: 'tray' }, handEl, actEl);
+  const sumEl = h('div', { class: 'turnsum', hidden: true, onclick: () => closeSummary() });
+  mapwrap.append(sumEl);
+  let sumTimer = null;
   root.append(hud, mapwrap, tray);
 
   const keys = HX.shape(S.R).all;
@@ -147,7 +150,7 @@ export function colonyScreen(root, S, hooks) {
       h('button', { class: 'btn', onclick: goals }, '🎯 Goals'),
       h('button', { class: 'btn', disabled: busy, onclick: hint }, '💡 Hint'),
       h('button', { class: 'btn', disabled: busy || sel == null || S.scrapped, onclick: scrap, title: 'Scrap the selected card for +1 Influence (once per turn)' }, '🗑 Scrap'),
-      h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { passTurn(S); after(S.seq); }) }, '⏭ Pass'),
+      h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
       h('button', { class: 'btn', onclick: menu }, '☰'));
   }
 
@@ -159,6 +162,7 @@ export function colonyScreen(root, S, hooks) {
 
   function selectCard(i) {
     if (S.status !== 'play') return;
+    closeSummary();
     abil = null;
     if (sel === i) {
       cardSheet(S.hand[i]);
@@ -201,7 +205,7 @@ export function colonyScreen(root, S, hooks) {
     sheet({
       title: `Build ${CARDS[cid].n}?`,
       body: h('div', null,
-        h('p', { class: 'dim', style: { marginTop: 0 } }, CARDS[cid].text),
+        h('div', { class: 'tx dim', style: { marginTop: 0 } }, cardText(CARDS[cid].text)),
         h('div', { class: 'row', style: { margin: '8px 0' } }, h('span', { class: 'chip good' }, `This turn: +${f.gain}`), h('span', { class: 'chip' }, `Next 3 turns: ≈+${f.soon}`), f.integrity < 0 ? h('span', { class: 'chip bad' }, `${f.integrity} Integrity`) : null),
         h('div', { class: 'sect' }, 'Expected chain'),
         rows.length ? rows.map(feedLine) : h('div', { class: 'dim' }, 'Nothing triggers yet – this building pays off later.'),
@@ -225,9 +229,64 @@ export function colonyScreen(root, S, hooks) {
     render();
     animate(entries);
     const alerts = entries.filter((e) => e.sys && /Checkpoint|Integrity|ROAR|TIDE|GROWTH|destroyed/.test(e.sys)).map((e) => e.sys);
-    if (!keepTurn && before != null) toast(`Turn ${turn}: +${S.influence - before} Influence · drew ${S.lastDraw || 0}`);
+    const dur = !keepTurn && before != null ? turnSummary(entries, before, turn) : 0;
     if (alerts.length) setTimeout(() => toast(alerts.slice(0, 2).join(' · ') + (alerts.length > 2 ? ` (+${alerts.length - 2} more in Log)` : '')), 900);
-    if (S.status !== 'play') setTimeout(() => hooks.onDone(), 1400);
+    if (S.status !== 'play') setTimeout(() => hooks.onDone(), Math.max(1400, dur + 2000));
+  }
+
+  function closeSummary() {
+    clearInterval(sumTimer);
+    sumEl.hidden = true;
+  }
+
+  // End-of-turn tally: each scoring activation is added to the turn total in order, then the
+  // level total is shown against the checkpoint target and the turns left. Returns its duration.
+  function turnSummary(entries, before, turn) {
+    clearInterval(sumTimer);
+    const acts = entries.filter((e) => e.pts > 0);
+    const gain = S.influence - before;
+    const other = gain - acts.reduce((x, e) => x + e.pts, 0);
+    const steps = acts.map((e) => ({ el: feedLine(e), pts: e.pts }));
+    if (other) steps.push({ el: h('div', { class: 'logline' }, h('span', null, 'Scrap & overflow'), h('span', { class: 'dim' }), h('span', { class: 'pts' }, '+' + other)), pts: other });
+    const cpHit = S.checkpoints.find((c) => c.turn === turn);
+    const next = S.checkpoints.find((c) => c.met == null);
+    const lines = h('div', { class: 'ts-lines' }, steps.length ? null : h('div', { class: 'dim' }, 'No buildings scored this turn.'));
+    const tot = h('b', { class: 'pts' }, '+0');
+    const lvl = h('b', null, before);
+    const row = (lbl, val, cls = '') => h('div', { class: 'ts-row ' + cls }, h('span', null, lbl), val);
+    const tail = h('div', { class: 'ts-tail', hidden: steps.length > 0 },
+      cpHit ? row(`Checkpoint · turn ${cpHit.turn}`, h('b', { class: cpHit.met ? 'good' : 'bad' }, `${cpHit.need} ${cpHit.met ? '✅ met' : '❌ missed'}`)) : null,
+      next ? [
+        row(`Target · by turn ${next.turn}`, h('b', null, next.need), 'ts-target'),
+        row('Still needed', h('b', { class: S.influence >= next.need ? 'good' : '' }, S.influence >= next.need ? 'On track ✅' : `+${next.need - S.influence}`)),
+        row('Turns left for this target', h('b', null, next.turn - turn)),
+      ] : null,
+      S.checkpoints.length > 1 && next ? row('Checkpoint', h('b', null, `${S.checkpoints.indexOf(next) + 1} of ${S.checkpoints.length}`)) : null,
+      row('Turns left in level', h('b', null, `${S.turns - turn} of ${S.turns}`)));
+    sumEl.innerHTML = '';
+    sumEl.append(
+      h('div', { class: 'ts-head' }, h('span', null, `Turn ${turn} scoring`), h('span', { class: 'faint' }, 'tap to close')),
+      lines,
+      row('Turn total', tot, 'ts-total'),
+      row('Level total', lvl, 'ts-level'),
+      tail);
+    sumEl.hidden = false;
+    let i = 0, run = 0;
+    sumTimer = setInterval(() => {
+      if (i >= steps.length) {
+        clearInterval(sumTimer);
+        lvl.textContent = S.influence;
+        tail.hidden = false;
+        return;
+      }
+      const st = steps[i++];
+      run += st.pts;
+      lines.append(st.el);
+      lines.scrollTop = lines.scrollHeight;
+      tot.textContent = '+' + run;
+      lvl.textContent = before + run;
+    }, 140);
+    return (steps.length + 1) * 140;
   }
 
   function animate(entries) {
@@ -351,6 +410,7 @@ export function colonyScreen(root, S, hooks) {
   }
 
   function hint() {
+    closeSummary();
     const m = bestMove(S, { look: 2, maxHexes: 30 });
     if (!m) return toast('No legal placements – pass the turn.');
     sel = m.i;

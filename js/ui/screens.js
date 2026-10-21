@@ -1,5 +1,5 @@
 import { h, sheet } from './dom.js';
-import { cardEl, trigLabel } from './cardview.js';
+import { cardEl, cardText, trigLabel } from './cardview.js';
 import { CLANS, CLAN_IDS, CARD_LIST, RARITY, TIER } from '../engine/cards.js';
 import { rubric, BANDS, HORIZON } from '../engine/rubric.js';
 import { STARTERS } from '../engine/mapgen.js';
@@ -65,7 +65,7 @@ export function codexScreen(root, { onBack }) {
       body.append(h('div', { class: 'list' }, cards.filter((c) => c.t === t).map((c) => {
         const r = rubric(c);
         return h('div', { class: 'item codex-card', onclick: () => sheet({ title: c.n, body: h('div', null, cardEl(c.id, { big: true }), c.rb && c.rb.why ? h('p', { class: 'dim' }, 'Balance note: ', c.rb.why) : null, partsEl(r)) }) },
-          h('div', null, h('b', null, c.n), ' ', h('span', { class: 'pill-' + c.r }, RARITY[c.r].n), h('div', { class: 'faint', style: { fontSize: '11px' } }, `${trigLabel(c)} · ${c.tags.join(' · ')}`), h('div', { class: 'dim', style: { fontSize: '12px' } }, c.text)),
+          h('div', null, h('b', null, c.n), ' ', h('span', { class: 'pill-' + c.r }, RARITY[c.r].n), h('div', { class: 'faint', style: { fontSize: '11px' } }, `${trigLabel(c)} · ${c.tags.join(' · ')}`), h('div', { class: 'tx dim', style: { fontSize: '12px' } }, cardText(c.text))),
           h('div', { style: { textAlign: 'right' } }, h('div', { class: 'pp pill-' + c.r }, r.pp), h('div', { class: 'faint', style: { fontSize: '10px' } }, `meas. ${MEASURED[c.id] ?? '–'}`)));
       })));
     }

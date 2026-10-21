@@ -10,7 +10,7 @@ import {
   SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone,
 } from '../engine/colony.js';
 import { bestMove } from '../engine/ai.js';
-import { buildingTile, resourceTile, mapBackdrop, isMissing, markMissing } from './art.js';
+import { buildingTile, resourceTile, mapBackdrop, MAP_FALLBACK, isMissing, markMissing } from './art.js';
 
 const SZ = 10;
 const PHASES = [['🌅', 'Dawn'], ['☀️', 'High Sun'], ['🌇', 'Dusk'], ['🌑', 'Deep Night']];
@@ -177,9 +177,13 @@ export function colonyScreen(root, S, hooks) {
         s('stop', { offset: '0%', 'stop-color': '#fff', 'stop-opacity': 0.06 }),
         s('stop', { offset: '65%', 'stop-color': '#000', 'stop-opacity': 0.15 }),
         s('stop', { offset: '100%', 'stop-color': '#000', 'stop-opacity': 0.6 })));
-    if (!isMissing(backdropSrc)) {
-      const im = s('image', { href: backdropSrc, x: -PR, y: -PR, width: 2 * PR, height: 2 * PR, preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#planetclip)', class: 'planet-bg', 'pointer-events': 'none' });
-      im.addEventListener('error', () => { markMissing(backdropSrc); im.remove(); });
+    const bgSrc = [backdropSrc, MAP_FALLBACK].find((src) => !isMissing(src));
+    if (bgSrc) {
+      const im = s('image', { href: bgSrc, x: -PR, y: -PR, width: 2 * PR, height: 2 * PR, preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#planetclip)', class: 'planet-bg', 'pointer-events': 'none' });
+      im.addEventListener('error', () => {
+        markMissing(im.getAttribute('href'));
+        if (isMissing(MAP_FALLBACK)) im.remove(); else im.setAttribute('href', MAP_FALLBACK);
+      });
       gBase.append(im);
     }
     gBase.append(s('circle', { cx: 0, cy: 0, r: PR, fill: 'url(#planetshade)', stroke: '#8fb4ff', 'stroke-width': 0.4, 'stroke-opacity': 0.35, 'pointer-events': 'none' }));

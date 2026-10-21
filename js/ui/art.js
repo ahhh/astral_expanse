@@ -4,8 +4,10 @@
 export const buildingTile = (cid) => `art/tiles/b/${cid}.webp`;
 export const resourceTile = (res) => `art/tiles/r/${res}.webp`;
 export const planetIcon = (id) => `art/planets/${id}.webp`;
-// Optional per-planet-type colony backdrops: drop art/maps/<type>.webp in to use one.
+// Per-planet-type colony backdrops (art/maps/<type>.webp). A type without its own
+// art (e.g. enclaves) falls back to the generic prospect world.
 export const mapBackdrop = (type) => `art/maps/${type}.webp`;
+export const MAP_FALLBACK = mapBackdrop('prospect');
 
 // Remembers which images failed so redraws go straight to the fallback.
 const missing = new Set();

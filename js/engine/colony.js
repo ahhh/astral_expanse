@@ -124,6 +124,7 @@ function effRange(S, b, n) {
 export function isShielded(S, k) {
   const h = S.hexes[k];
   if (h.st.Shielded) return true;
+  if (hasTech(S, 'shieldgrid') && H.dist(k, '0,0') <= 2) return true;
   for (const b of bldList(S)) {
     const c = card(b);
     if (c.shields && c.shields(mkApi(S, { b, notes: [] }), b, k)) return true;
@@ -183,7 +184,7 @@ function blocked(S, b) {
 export function activate(S, b, ev, o = {}) {
   if (!S.blds[b.id] || blocked(S, b)) return false;
   const c = card(b);
-  const cap = c.cap || CAP;
+  const cap = (c.cap || CAP) + (hasTech(S, 'overclock') ? 1 : 0);
   if (b.acts >= cap && !o.extra) return false;
   const ctx = { b, ev, did: false, pts: 0, notes: [] };
   const fn = o.fn || c.run;
@@ -233,7 +234,10 @@ function setRes(S, k, type, amt = 1) {
   S.hexes[k].amt = amt;
 }
 function recordCreate(S, type) {
-  if (type === 'Alloy') S.stats.alloy++;
+  if (type === 'Alloy') {
+    S.stats.alloy++;
+    if (S.mega && S.mega.processor && S.stats.alloy % 3 === 0) megaScore(S, 'processor', 8);
+  }
   if (type === 'Biomass') S.stats.biomass++;
   if (type === 'Anomaly') S.stats.exotic++;
 }
@@ -250,6 +254,7 @@ function destroyBuilding(S, b, srcId) {
 function loseIntegrity(S, n, why) {
   if (n <= 0) return;
   if (S.insurance > 0) { S.insurance--; note(S, `Hazard Insurance absorbed ${why}`); return; }
+  if (S.mega && S.mega.nexus && S.nexusEra !== era(S)) { S.nexusEra = era(S); note(S, `Civilization Nexus absorbed ${why}`); return; }
   for (const b of bldList(S)) {
     if (card(b).preventLoss && b.mem.ple !== era(S) && !blocked(S, b)) {
       b.mem.ple = era(S);
@@ -470,6 +475,7 @@ export function mkApi(S, ctx) {
       const t = a.consume(k);
       if (!t) return false;
       S.stats.launched++;
+      if (S.mega && S.mega.tradering && S.stats.launched % 3 === 0) megaScore(S, 'tradering', 10);
       const orbitK = H.shape(S.R).orbit.slice().sort((x, y) => H.dist(x, k) - H.dist(y, k))[0];
       emit(S, { type: 'launch', k, res: t, src });
       emit(S, { type: 'arrival', k: orbitK, res: t, src });
@@ -593,6 +599,7 @@ function bossStep(S) {
   if (!B) return;
   const land = H.shape(S.R).land;
   if (B.type === 'aurelia') {
+    if (B.meter >= 6 && wardOff(S)) B.meter = 0;
     if (B.meter >= 6) {
       note(S, '🌋 MANTLE ROAR – the golden mantle heaves!');
       let lost = 0;
@@ -612,6 +619,7 @@ function bossStep(S) {
     }
   } else if (B.type === 'nyxea') {
     B.clock++;
+    if ((B.meter >= 8 || B.clock >= 5) && wardOff(S)) { B.meter = 0; B.clock = 0; }
     if (B.meter >= 8 || B.clock >= 5) {
       note(S, '🌊 FRACTURE TIDE – water floods through the cracks!');
       let lost = 0;
@@ -641,6 +649,7 @@ function bossStep(S) {
     }
     processQueue(S);
     B.clock++;
+    if (B.clock >= 3 && wardOff(S)) B.clock = 0;
     if (B.clock >= 3) {
       B.clock = 0;
       const seeds = land.filter((k) => ['Growth', 'Loam', 'Biomass', 'Seam'].includes(S.hexes[k].res));
@@ -651,6 +660,13 @@ function bossStep(S) {
       note(S, `🌱 WILD GROWTH spreads (${Math.min(n, 4 + B.wave)} hexes)`);
     }
   }
+}
+// Thermal Reserve supply token: the first boss hazard fizzles.
+function wardOff(S) {
+  if (!S.boss.ward) return false;
+  S.boss.ward = 0;
+  note(S, '🧪 Thermal Reserve absorbed the planet\'s first hazard');
+  return true;
 }
 // Every objective can be met by any trio (design guardrail: no compulsory clan).
 export function bossObjective(S) {
@@ -778,13 +794,22 @@ export function useAbility(S, bid, k) {
   return true;
 }
 
+// Artificial Dawn: Solar buildings in the project network keep working for
+// the first Shadow turn after they were lit.
+function dawnLit(S, b) {
+  const lit = isLit(S, b.k);
+  const prev = b.mem.litT;
+  if (lit) b.mem.litT = S.turn;
+  return !lit && !!(S.mega && S.mega.dawn) && prev === S.turn - 1 && hasTag(b, 'Solar') && (S.megaNet?.dawn || []).includes(b.id);
+}
+
 function periodicDue(S, b) {
   const c = card(b);
   switch (c.trig) {
     case 'turn': return true;
     case 'every': return b.age % c.every === 0;
-    case 'sunlit': return isLit(S, b.k);
-    case 'sunlit2': if (isLit(S, b.k)) { b.sun++; return b.sun % 2 === 0; } return false;
+    case 'sunlit': return isLit(S, b.k) || dawnLit(S, b);
+    case 'sunlit2': if (isLit(S, b.k) || dawnLit(S, b)) { b.sun++; return b.sun % 2 === 0; } return false;
     case 'shadow': return !isLit(S, b.k);
     default: return false;
   }
@@ -808,6 +833,9 @@ export function endTurn(S) {
     processQueue(S);
   }
   for (const b of late) { activate(S, b, null, { periodic: true }); processQueue(S); }
+  // 2b. mega-projects and local technologies
+  megaStep(S);
+  techStep(S);
   // 3. scheduled event
   for (const E of S.events) if (E.turn === S.turn && !E.done) runEvent(S, E);
   // 4. boss
@@ -826,7 +854,10 @@ export function endTurn(S) {
   if (cp) {
     cp.at = S.influence;
     cp.met = S.influence >= cp.need;
-    if (cp.met) note(S, `✅ Checkpoint ${cp.need} met`);
+    if (cp.met) {
+      note(S, `✅ Checkpoint ${cp.need} met`);
+      if (cp.turn < S.turns) offerTech(S);
+    }
     else if (cp.turn === S.turns) note(S, `❌ Final checkpoint ${cp.need} missed`);
     else { note(S, `⚠️ Checkpoint ${cp.need} missed`); loseIntegrity(S, 3, 'missed checkpoint'); }
   }
@@ -835,12 +866,125 @@ export function endTurn(S) {
   if (S.turn >= S.turns) { finish(S); return; }
   // 8. next turn & draws
   S.lastClans = clansNow;
-  const draws = 1 + (clansNow >= 2 ? 1 : 0) + (clansNow >= 3 ? 1 : 0) + S.bonusDraw;
+  const draws = drawsFor(S, clansNow) + S.bonusDraw + (hasTech(S, 'drone') ? 1 : 0) + ((S.tradeCharter || []).includes(S.turn + 1) ? 1 : 0);
   S.bonusDraw = 0;
   S.turn++;
   resetTurnState(S);
   dealDraws(S, draws);
   S.lastDraw = draws;
+}
+
+// 1 draw, +1 if two clans activated (or your only clan did), +1 more if all three did.
+export function drawsFor(S, clansNow) {
+  const n = S.clans.length;
+  return 1 + (clansNow >= Math.min(2, n) ? 1 : 0) + (n >= 3 && clansNow >= 3 ? 1 : 0);
+}
+
+// ---------------------------------------------------------------- local technologies
+// Offered at each met (non-final) checkpoint; they last for this map only.
+export const TECHS = {
+  echo: { n: 'Activation Echo', ic: '🔁', d: 'Once per era, at the end of a turn, your highest-earning building activates again.' },
+  survey: { n: 'Field Survey', ic: '🛰️', d: 'Reveal every buried surface deposit now and draw 1 extra card next turn.' },
+  weave: { n: 'Structural Weave', ic: '🧱', d: '+3 Integrity and +3 maximum Integrity.' },
+  shieldgrid: { n: 'Shield Grid', ic: '🛡️', d: 'Every hex within range 2 of the Charter Beacon counts as Shielded.' },
+  overclock: { n: 'Overclock', ic: '⚡', d: 'Every building may activate one extra time per turn.' },
+  drone: { n: 'Supply Drones', ic: '📦', d: 'Draw 1 extra card every turn.' },
+  resonance: { n: 'Clan Resonance', ic: '🎼', d: 'At the end of each turn, +2 Influence per clan that activated.' },
+};
+export const hasTech = (S, id) => !!(S.techs && S.techs.includes(id));
+function offerTech(S) {
+  const pool = Object.keys(TECHS).filter((t) => !hasTech(S, t));
+  const out = [];
+  while (out.length < 3 && pool.length) out.push(pool.splice(rint(S, pool.length), 1)[0]);
+  if (out.length) { S.techOffer = out; note(S, '🔬 Local technology available'); }
+}
+export function chooseTech(S, id) {
+  if (!S.techOffer || !S.techOffer.includes(id)) return false;
+  S.techOffer = null;
+  S.techs = (S.techs || []).concat(id);
+  note(S, `🔬 ${TECHS[id].n} installed`);
+  if (id === 'weave') { S.integrity += 3; S.maxIntegrity += 3; }
+  if (id === 'survey') {
+    for (const k of H.shape(S.R).land) if (S.hexes[k].kind !== 'rock') S.hexes[k].hid = false;
+    S.bonusDraw++;
+  }
+  return true;
+}
+function techStep(S) {
+  if (hasTech(S, 'echo') && S.echoEra !== era(S)) {
+    const best = bldList(S).filter((b) => b.c !== 'beacon' && canRepeatCard(card(b)) && !blocked(S, b)).sort((a, b) => b.inf - a.inf)[0];
+    if (best) {
+      S.echoEra = era(S);
+      activate(S, best, null, { repeat: true, extra: true, fn: card(best).run || card(best).build });
+      processQueue(S);
+    }
+  }
+  if (hasTech(S, 'resonance')) {
+    const n = Object.keys(S.tstat.clans).filter((c) => S.clans.includes(c)).length;
+    if (n) { S.influence += 2 * n; note(S, `🎼 Clan Resonance +${2 * n}`); }
+  }
+}
+
+// ---------------------------------------------------------------- mega-projects
+// Recognized arrangements of buildings: +12 on completion, then a lasting perk.
+export const MEGA = {
+  dawn: { n: 'Artificial Dawn', ic: '🌄', req: '3 Solar and 2 other Power buildings in one network', d: 'Solar buildings in that network keep firing for one Shadow turn after sunset.' },
+  biosphere: { n: 'Deep Biosphere', ic: '🌳', req: '4 connected Bio buildings, 2 of them on Pressurized or Cavern hexes', d: '+4 Influence every turn.' },
+  tradering: { n: 'Orbital Trade Ring', ic: '💫', req: '3 Orbit/Orbital buildings and at least one Cargo launch', d: 'Every third Cargo launch scores +10.' },
+  processor: { n: 'Planetary Processor', ic: '🏭', req: '3 connected Mining/Industry/Metal buildings and 2 Alloy created', d: 'Every third Alloy created scores +8.' },
+  nexus: { n: 'Civilization Nexus', ic: '🏛️', req: 'Connected buildings on Pressurized hexes from every active clan (2+ clans)', d: '+2 Influence per active clan every turn; the first Integrity loss each era is prevented.' },
+  reactor: { n: 'Exotic Reactor', ic: '☢️', req: '3 Exotic/Radiation/Crystal buildings next to an Anomaly', d: 'Each turn one of them activates again (+3); it may irradiate a hex.' },
+};
+function megaScore(S, id, n) {
+  S.influence += n;
+  note(S, `${MEGA[id].ic} ${MEGA[id].n} +${n}`);
+}
+function components(S) {
+  const seen = new Set();
+  const out = [];
+  for (const b of bldList(S)) {
+    if (seen.has(b.id) || b.c === 'beacon') continue;
+    const comp = [b].concat(network(S, b)).filter((x) => x.c !== 'beacon');
+    comp.forEach((x) => seen.add(x.id));
+    out.push(comp);
+  }
+  return out;
+}
+export function megaProgress(S) {
+  const comps = components(S);
+  const tagged = (bs, ...ts) => bs.filter((b) => ts.some((t) => hasTag(b, t)));
+  const best = (f) => comps.reduce((m, c) => Math.max(m, f(c)), 0);
+  const nextAnom = bldList(S).filter((b) => (hasTag(b, 'Exotic') || hasTag(b, 'Radiation') || hasTag(b, 'Crystal')) && nextToAnomaly(S, b));
+  return {
+    dawn: { have: best((c) => Math.min(3, tagged(c, 'Solar').length) + Math.min(2, c.filter((b) => hasTag(b, 'Power') && !hasTag(b, 'Solar')).length)), need: 5, net: comps.find((c) => tagged(c, 'Solar').length >= 3 && c.filter((b) => hasTag(b, 'Power') && !hasTag(b, 'Solar')).length >= 2) },
+    biosphere: { have: best((c) => { const bio = tagged(c, 'Bio'); return Math.min(4, bio.length) + Math.min(2, bio.filter((b) => S.hexes[b.k].st.Pressure || S.hexes[b.k].kind === 'cavern').length); }), need: 6 },
+    tradering: { have: Math.min(3, bldList(S).filter((b) => S.hexes[b.k].kind === 'orbit' || hasTag(b, 'Orbit') || hasTag(b, 'Orbital')).length) + Math.min(1, S.stats.launched), need: 4 },
+    processor: { have: best((c) => Math.min(3, tagged(c, 'Mining', 'Industry', 'Metal').length)) + Math.min(2, S.stats.alloy), need: 5 },
+    nexus: { have: S.clans.length < 2 ? 0 : best((c) => new Set(c.filter((b) => S.hexes[b.k].st.Pressure).map((b) => b.clan)).size), need: S.clans.length < 2 ? 99 : S.clans.length },
+    reactor: { have: Math.min(3, nextAnom.length), need: 3, blds: nextAnom },
+  };
+}
+function megaStep(S) {
+  S.mega = S.mega || {};
+  const pr = megaProgress(S);
+  for (const id of Object.keys(MEGA)) {
+    if (S.mega[id] || pr[id].have < pr[id].need) continue;
+    S.mega[id] = S.turn;
+    note(S, `🏗 Mega-project complete: ${MEGA[id].n}!`);
+    megaScore(S, id, 12);
+  }
+  if (S.mega.dawn && pr.dawn.net) S.megaNet = { dawn: pr.dawn.net.map((b) => b.id) };
+  if (S.mega.biosphere) megaScore(S, 'biosphere', 4);
+  if (S.mega.nexus) megaScore(S, 'nexus', 2 * S.clans.length);
+  if (S.mega.reactor && pr.reactor.blds.length) {
+    const b = pr.reactor.blds[rint(S, pr.reactor.blds.length)];
+    if (activate(S, b, null, { repeat: true, extra: true, fn: card(b).run || card(b).build })) megaScore(S, 'reactor', 3);
+    if (rnd(S) < 0.3) {
+      const f = H.near(S.R, b.k, 2).filter((k) => S.hexes[k].kind !== 'rock' && S.hexes[k].kind !== 'orbit');
+      if (f.length) addStatus(S, f[rint(S, f.length)], 'Radiation');
+    }
+    processQueue(S);
+  }
 }
 
 function checkFail(S) {
@@ -855,7 +999,7 @@ export function integrateDone(S) {
   const beacon = bldList(S).find((b) => b.c === 'beacon');
   if (!beacon) return false;
   const cl = new Set(network(S, beacon).map((b) => b.clan));
-  return S.clans.every((c) => cl.has(c));
+  return S.clans.every((c) => cl.has(c)) && network(S, beacon).length >= 2;
 }
 
 function finish(S) {

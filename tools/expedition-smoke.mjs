@@ -1,32 +1,72 @@
-// Plays whole expeditions with the bot to check the overworld loop end to end.
+// Plays whole expeditions with the bot to check the overworld loop end to end:
+// a single starting clan, enclaves, lanes, crises, compacts, contracts, the
+// Foundry, the Fleet Yard, the Veil's supply tokens and one Endless round.
+//
+//   node tools/expedition-smoke.mjs [runs=3] [difficulty=standard]
 import * as X from '../js/engine/expedition.js';
-import { playCard, passTurn } from '../js/engine/colony.js';
+import { playCard, passTurn, chooseTech } from '../js/engine/colony.js';
 import { bestMove, tryAbilities } from '../js/engine/ai.js';
 import { CLAN_IDS } from '../js/engine/cards.js';
 
 const runs = Number(process.argv[2] || 3);
+const difficulty = process.argv[3] || 'standard';
 let wins = 0;
+
+function playColony(S) {
+  let g = 0;
+  while (S.status === 'play' && g++ < 40) {
+    if (S.techOffer) chooseTech(S, S.techOffer[0]);
+    tryAbilities(S);
+    const m = bestMove(S, { maxHexes: 18, look: 1 });
+    if (m) playCard(S, m.i, m.k); else passTurn(S);
+  }
+}
+
+function spend(E) {
+  if (E.pendingCompact) X.chooseCompact(E, 'industrial');
+  if (!E.contract && E.contractOffers.length) X.acceptContract(E, E.contractOffers[0]);
+  for (const c of X.openCrises(E)) X.resolveCrisis(E, c.id);
+  // Lanes: connect every network node to the cheapest supplied neighbour, then one extra for rings.
+  for (const n of E.chart.nodes) if (X.canConnect(E, n) && X.canAfford(E, X.laneCost(E, n))) X.connect(E, n.id);
+  for (const n of E.chart.nodes) {
+    if (!n.connected || n.type === 'ark') continue;
+    const o = X.laneOptions(E, n.id).find((x) => x.cls <= 2 && X.canAfford(E, x.cost));
+    if (o && E.res.AL > 8) X.buildLane(E, n.id, o.to);
+  }
+  const bp = E.foundry.offers.find((id) => E.clans.includes(id.cl) || true);
+  if (bp && X.canAfford(E, X.blueprintCost(E, bp)) && E.res.CR > 8) X.buyBlueprint(E, bp);
+  for (const f of ['keel', 'mast', 'tug']) if (!E.fleet[f] && X.canAfford(E, X.FLEET[f].cost) && E.res.AL > 9) X.buyFleet(E, f);
+  for (const cl of E.clans) { const c = X.enhCost(E, cl); if (c && X.canAfford(E, c) && E.res.CR > 7) X.enhance(E, cl); }
+  for (const n of E.chart.nodes) if (n.state === 'stranded' && n.type !== 'boss' && X.canAfford(E, X.rescueCost(E)) && E.res.AL > 6) X.rescue(E, n.id);
+}
+
 for (let r = 0; r < runs; r++) {
-  const clans = [CLAN_IDS[r % 9], CLAN_IDS[(r + 3) % 9], CLAN_IDS[(r + 5) % 9]];
-  const E = X.newExpedition(4242 + r, clans);
-  let guard = 0;
-  while (E.status === 'active' && guard++ < 40) {
+  const E = X.newExpedition(4242 + r, [CLAN_IDS[r % 9]], { difficulty });
+  let guard = 0, endless = false;
+  while (E.status !== 'lost' && guard++ < 70) {
+    if (E.status === 'won') {
+      if (endless) break;
+      endless = true;
+      X.enterEndless(E);
+      console.log('  → Endless Frontier');
+    }
+    spend(E);
     const opts = X.reachable(E);
     if (!opts.length) { console.log('stuck at', X.node(E, E.at).name); break; }
-    // Prefer shrines, then claimed-yield-friendly nodes; avoid laterals late.
-    const pickE = opts.sort((a, b) => (X.node(E, b.to).type === 'shrine') - (X.node(E, a.to).type === 'shrine') || (a.lateral ? 1 : 0) - (b.lateral ? 1 : 0))[0];
-    X.travel(E, pickE.to, { bench: E.clans[2] });
+    const score = (e) => { const t = X.node(E, e.to).type; return (t === 'enclave' && E.clans.length < 3 ? 3 : 0) + (t === 'shrine' ? 2 : 0) - (e.lateral ? 1 : 0); };
+    const pickE = opts.sort((a, b) => score(b) - score(a))[0];
+    const tgt = X.node(E, pickE.to);
+    const supply = tgt.type === 'boss' ? Object.keys(X.SUPPLY).filter((s) => X.canAfford(E, X.SUPPLY[s].cost)).slice(0, X.supplyTokens(E)) : [];
+    X.travel(E, pickE.to, { bench: E.clans[E.clans.length - 1], supply });
     if (!E.colony) continue;
     const S = E.colony;
-    let g2 = 0;
-    while (S.status === 'play' && g2++ < 40) { tryAbilities(S); const m = bestMove(S, { maxHexes: 18, look: 1 }); if (m) playCard(S, m.i, m.k); else passTurn(S); }
+    playColony(S);
     const n = X.node(E, E.mission.node);
     const ch = S.status === 'won' && n.type !== 'boss' ? X.charterOptions(E).sort((a, b) => b.claim - a.claim)[0] : null;
-    console.log(`  ${n.type.padEnd(11)} ${n.name.padEnd(18)} ${S.status.padEnd(6)} inf ${String(S.influence).padStart(4)}/${S.checkpoints.at(-1).need} ${ch ? ch.n + ' +' + ch.claim + ch.pri : ''}`);
+    console.log(`  ${n.type.padEnd(11)} ${n.name.padEnd(20)} [${S.clans.join(',')}] ${S.status.padEnd(6)} inf ${String(S.influence).padStart(4)}/${S.checkpoints.at(-1).need} mega ${Object.keys(S.mega).length} tech ${S.techs.length} ${ch ? ch.n + ' +' + ch.claim + ch.pri : ''}`);
     X.resolveMission(E, ch && ch.fam);
-    if (n.state === 'claimed' && X.canConnect(E, n)) X.connect(E, n.id);
   }
-  if (E.status === 'won') wins++;
-  console.log(`Run ${r} [${clans}] → ${E.status} ${E.ending || ''} (${E.endReason}) pressure ${E.pressure} claimed ${E.claimed} res ${JSON.stringify(E.res)}`);
+  if (E.wonOnce) wins++;
+  console.log(`Run ${r} → ${E.status} ${E.ending || ''} (${E.endReason}) clans ${E.clans} pressure ${E.pressure}/${E.maxPressure} claimed ${E.claimed} lanes ${E.lanes.length} compacts ${E.compacts.length} contracts ${E.contractsDone.length} peak ${E.peakThroughput} res ${JSON.stringify(E.res)}`);
 }
 console.log(`${wins}/${runs} expeditions won`);

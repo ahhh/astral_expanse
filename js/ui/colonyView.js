@@ -7,7 +7,7 @@ import * as HX from '../engine/hex.js';
 import {
   isLit, legalHexes, forecast, playCard, passTurn, scrapCard, bldAt, bldList, network,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
-  SPECIALIZE, specializeDone, tierOpen, CAP,
+  SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone,
 } from '../engine/colony.js';
 import { bestMove } from '../engine/ai.js';
 
@@ -20,6 +20,11 @@ export function colonyScreen(root, S, hooks) {
   let sel = null;
   let fc = null;
   let abil = null;
+  // Undo: a snapshot from before the last placement or pass. `hooks.undo` is
+  // the per-turn allowance set by the expedition's difficulty.
+  let snap = null;
+  const undoUsed = {};
+  const undoLeft = () => (snap ? (hooks.undo ?? 1) - (undoUsed[snap.turn] || 0) : 0);
 
   root.innerHTML = '';
   const hud = h('div', { class: 'hud' });
@@ -41,7 +46,7 @@ export function colonyScreen(root, S, hooks) {
   svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
   const poly = (cx, cy, sz) => HX.corners(cx, cy, sz).map((p) => p.map((v) => v.toFixed(2)).join(',')).join(' ');
-  const forecastCount = () => (bldList(S).some((b) => CARDS[b.c].radar) ? 3 : 1);
+  const forecastCount = () => (S.fullForecast ? 99 : bldList(S).some((b) => CARDS[b.c].radar) ? 3 : 1);
   const upcoming = () => S.events.filter((e) => !e.done && e.turn >= S.turn).slice(0, forecastCount());
 
   function drawHUD() {
@@ -66,6 +71,9 @@ export function colonyScreen(root, S, hooks) {
         ev ? h('button', { class: 'chip', onclick: goals }, EVENT_INFO[ev.type].ic, ` T${ev.turn}`) : null),
       h('div', { class: 'l1', style: { fontSize: '11px' } },
         S.clans.map((c) => h('span', { class: 'chip', style: { borderColor: CLANS[c].col, color: CLANS[c].col } }, CLANS[c].ic, ' ', CLANS[c].n.split(' ')[0])),
+        (S.techs || []).map((t) => h('span', { class: 'chip', title: TECHS[t].n }, TECHS[t].ic)),
+        Object.keys(S.mega || {}).map((m) => h('span', { class: 'chip good', title: MEGA[m].n }, MEGA[m].ic)),
+        S.techOffer && S.status === 'play' ? h('button', { class: 'chip warn', onclick: techSheet }, '🔬 Choose tech') : null,
         S.boss ? h('span', { class: 'chip warn' }, `${BOSS_INFO[S.boss.type].meterName} ${S.boss.type === 'viridion' ? S.boss.clock + '/3' : S.boss.meter + '/' + BOSS_INFO[S.boss.type].max}`) : null));
   }
 
@@ -149,8 +157,9 @@ export function colonyScreen(root, S, hooks) {
       h('button', { class: 'btn', onclick: logSheet }, '📜 Log'),
       h('button', { class: 'btn', onclick: goals }, '🎯 Goals'),
       h('button', { class: 'btn', disabled: busy, onclick: hint }, '💡 Hint'),
+      hooks.undo ? h('button', { class: 'btn', disabled: busy || undoLeft() <= 0, onclick: undo, title: 'Rewind your last placement or pass' }, '↶ Undo') : null,
       h('button', { class: 'btn', disabled: busy || sel == null || S.scrapped, onclick: scrap, title: 'Scrap the selected card for +1 Influence (once per turn)' }, '🗑 Scrap'),
-      h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
+      h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; snap = { state: clone(S), turn }; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
       h('button', { class: 'btn', onclick: menu }, '☰'));
   }
 
@@ -188,6 +197,7 @@ export function colonyScreen(root, S, hooks) {
     if (abil) {
       if (abil.targets.includes(k)) {
         const seq = S.seq;
+        snap = null;
         useAbility(S, abil.b.id, k);
         abil = null;
         after(seq, true);
@@ -218,7 +228,9 @@ export function colonyScreen(root, S, hooks) {
     const seq = S.seq;
     const before = S.influence;
     const turn = S.turn;
+    const prior = { state: clone(S), turn };
     if (!playCard(S, sel, k)) return;
+    snap = prior;
     sel = null; fc = null;
     after(seq, false, before, turn);
   }
@@ -232,6 +244,32 @@ export function colonyScreen(root, S, hooks) {
     const dur = !keepTurn && before != null ? turnSummary(entries, before, turn) : 0;
     if (alerts.length) setTimeout(() => toast(alerts.slice(0, 2).join(' · ') + (alerts.length > 2 ? ` (+${alerts.length - 2} more in Log)` : '')), 900);
     if (S.status !== 'play') setTimeout(() => hooks.onDone(), Math.max(1400, dur + 2000));
+    else if (S.techOffer && !keepTurn) setTimeout(() => { if (S.techOffer) techSheet(); }, Math.max(900, dur + 1200));
+  }
+
+  function undo() {
+    if (!snap || undoLeft() <= 0) return;
+    undoUsed[snap.turn] = (undoUsed[snap.turn] || 0) + 1;
+    const st = snap.state;
+    snap = null;
+    for (const k of Object.keys(S)) delete S[k];
+    delete S._nc;
+    Object.assign(S, clone(st));
+    S._q = [];
+    sel = null; fc = null; abil = null;
+    closeSummary();
+    hooks.save();
+    render();
+    toast('Rewound to the start of the turn');
+  }
+
+  function techSheet() {
+    if (!S.techOffer) return;
+    sheet({
+      title: '🔬 Local technology',
+      body: h('div', null, h('p', { class: 'dim', style: { marginTop: 0 } }, 'Checkpoint met! Install one technology for the rest of this map.'),
+        h('div', { class: 'list' }, S.techOffer.map((t) => h('button', { class: 'charter', onclick: () => { chooseTech(S, t); closeSheets(); hooks.save(); render(); toast(`${TECHS[t].n} installed`); } }, h('b', null, `${TECHS[t].ic} ${TECHS[t].n}`), h('div', { class: 'dim', style: { fontSize: '12px' } }, TECHS[t].d))))),
+    });
   }
 
   function closeSummary() {
@@ -346,6 +384,7 @@ export function colonyScreen(root, S, hooks) {
                 toast('Tap a highlighted hex');
               } else {
                 const seq = S.seq;
+                snap = null;
                 useAbility(S, b.id);
                 after(seq, true);
               }
@@ -372,7 +411,7 @@ export function colonyScreen(root, S, hooks) {
     for (const t of turns.slice(0, 12)) {
       const es = S.feed.filter((e) => e.t === t);
       const sum = es.reduce((x, e) => x + (e.pts || 0), 0);
-      body.append(h('div', { class: 'sect' }, `Turn ${t} · +${sum}`), es.map(feedLine));
+      body.append(h('div', { class: 'sect' }, `Turn ${t} · +${sum}`), ...es.map(feedLine));
     }
     if (!turns.length) body.append(h('p', { class: 'dim' }, 'Nothing has happened yet. Build something!'));
     sheet({ title: 'Activation log', body });
@@ -389,7 +428,7 @@ export function colonyScreen(root, S, hooks) {
       body.append(h('div', { class: 'sect' }, 'Stabilization objective (required)'), h('div', { class: 'stamp' }, h('span', { class: 'ok' + (o.done ? ' y' : '') }, o.done ? '✓' : '…'), o.text));
     } else {
       body.append(h('div', { class: 'sect' }, 'Charter stamps (bigger shipments)'));
-      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (integrateDone(S) ? ' y' : '') }, integrateDone(S) ? '✓' : '…'), 'Integrate: connect buildings from all three active clans to the Charter Beacon ★'));
+      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (integrateDone(S) ? ' y' : '') }, integrateDone(S) ? '✓' : '…'), S.clans.length > 1 ? 'Integrate: connect buildings from every active clan to the Charter Beacon ★' : 'Integrate: connect 2+ buildings to the Charter Beacon ★'));
       for (const f of FAMILIES.concat(['trade'])) {
         const done = specializeDone(S, f);
         const sp = SPECIALIZE[f];
@@ -399,13 +438,22 @@ export function colonyScreen(root, S, hooks) {
       const fin = S.checkpoints[S.checkpoints.length - 1].need;
       body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (S.influence >= fin * 1.25 ? ' y' : '') }, '★'), `Masterwork: finish with ${Math.round(fin * 1.25)} Influence (+1 route charge)`));
     }
+    const mp = megaProgress(S);
+    body.append(h('div', { class: 'sect' }, 'Mega-projects (+12, then a lasting perk)'));
+    for (const [id, m] of Object.entries(MEGA)) {
+      const done = S.mega && S.mega[id];
+      const p = mp[id];
+      if (p.need > 50) continue;
+      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (done ? ' y' : '') }, done ? '✓' : m.ic), h('div', null, h('b', null, m.n), h('span', { class: 'faint' }, done ? ' – active' : ` ${Math.min(p.have, p.need)}/${p.need}`), h('div', { class: 'dim', style: { fontSize: '12px' } }, `${m.req}. ${m.d}`))));
+    }
+    if ((S.techs || []).length) body.append(h('div', { class: 'sect' }, 'Local technologies'), ...S.techs.map((t) => h('div', { class: 'logline' }, `${TECHS[t].ic} ${TECHS[t].n} – `, h('span', { class: 'dim' }, TECHS[t].d))));
     body.append(h('div', { class: 'sect' }, 'Forecast'));
     const up = upcoming();
     if (!up.length) body.append(h('div', { class: 'dim' }, 'No further events forecast.'));
     for (const e of up) body.append(h('div', { class: 'item' }, h('h4', null, `${EVENT_INFO[e.type].ic} Turn ${e.turn}: ${EVENT_INFO[e.type].n}`), h('div', { class: 'dim' }, EVENT_INFO[e.type].d)));
-    if (forecastCount() === 1) body.append(h('p', { class: 'faint' }, 'Build a Radar Dish to see the next 3 events.'));
+    if (forecastCount() === 1 && !S.fullForecast) body.append(h('p', { class: 'faint' }, 'Build a Radar Dish to see the next 3 events.'));
     body.append(h('div', { class: 'sect' }, 'Card pool'),
-      h('p', { class: 'dim' }, `Mid buildings ${tierOpen(S, 'M') ? 'are unlocked' : `unlock on turn ${6 - 2 * (S.draw.research || 0)}`}; Advanced ${tierOpen(S, 'A') ? 'are unlocked' : `on turn ${11 - 2 * (S.draw.research || 0)}`}. Each turn you draw 1 card, +1 if two clans activated last turn, +1 more if all three did.`));
+      h('p', { class: 'dim' }, `Mid buildings ${tierOpen(S, 'M') ? 'are unlocked' : `unlock on turn ${6 - 2 * (S.draw.research || 0)}`}; Advanced ${tierOpen(S, 'A') ? 'are unlocked' : `on turn ${11 - 2 * (S.draw.research || 0)}`}. Each turn you draw 1 card, +1 if ${S.clans.length > 1 ? 'two clans' : 'your clan'} activated last turn${S.clans.length >= 3 ? ', +1 more if all three did' : ''}.`));
     sheet({ title: 'Goals & forecast', body });
   }
 

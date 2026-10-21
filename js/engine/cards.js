@@ -1,4 +1,5 @@
-// The 135 base buildings (15 per clan) plus the neutral Charter Beacon.
+// The 135 base buildings (15 per clan), the 18 Card Foundry blueprints and
+// the neutral Charter Beacon.
 //
 // Card fields
 //   id, n (name), cl (clan), t (tier E/M/A), r (rarity C/U/R), tags, text
@@ -1321,18 +1322,181 @@ const list = [
   },
 ];
 
+// ---- Card Foundry: 18 shop-only blueprints (2 per clan) --------------------
+// Bought on the star chart; a purchase adds the card to its clan's draw pool
+// for the rest of the expedition. Never part of the baseline 135.
+const foundry = [
+  {
+    id: 'auric_assayer', n: 'Auric Assayer', cl: 'iron', t: 'M', r: 'U', tags: ['Mining', 'Precious'], trig: 'event', cost: { AL: 4, CR: 3 },
+    text: 'On Build: +3 per Gold Vein within range 2 (max 3). Reactive: Whenever Gold is extracted within range 2, +6 and it counts twice toward the Mint charter stamp.',
+    build(a) { a.score(3 * Math.max(1, resCount(a, 'Gold', 2, 3))); },
+    L: [{ on: 'extract', r: 2, run(a, b, ev) { if (ev.res === 'Gold') { a.S.stats.precious++; a.score(6); } } }],
+    rb: { once: 6, react: { p: 6, rate: 0.3 }, u2: 2, why: 'Gold payoff that also fast-tracks the Mint charter.' },
+  },
+  {
+    id: 'microfault_weaver', n: 'Microfault Weaver', cl: 'iron', t: 'M', r: 'U', tags: ['Anchor', 'Mining'], trig: 'event', cost: { AL: 5, DA: 3 },
+    text: 'On Build: Excavate an adjacent Rock hex into a Stable Cavern, +6. Reactive: When a Cavern opens within range 2, reveal a buried deposit next to it, +5.',
+    build(a) {
+      const k = a.near(a.k, 1).find((x) => a.kind(x) === 'rock');
+      if (k) { a.excavate(k); a.addSt(k, 'Stable'); a.score(6); } else a.score(2);
+    },
+    L: [{ on: 'excavate', r: 2, run(a, b, ev) { const k = a.near(ev.k, 1).find((x) => a.hidden(x)); if (k) { a.reveal(k); a.score(5); } } }],
+    rb: { once: 10, react: { p: 5, rate: 0.35 }, u2: 1.5, why: 'Stabilized excavation and buried-deposit discovery.' },
+  },
+  {
+    id: 'eclipse_capacitor', n: 'Eclipse Capacitor', cl: 'helio', t: 'M', r: 'U', tags: ['Solar', 'Storage'], trig: 'sunlit', pts: 2, cost: { CY: 4, DA: 3 },
+    text: 'Every Sunlit Turn: Store one Charge (max 3), +2. Reactive: On entering Shadow, spend a Charge to repeat an adjacent Cold or Power building, +4.',
+    run(a) { const m = a.mem(); if ((m.ch || 0) < 3) m.ch = (m.ch || 0) + 1; a.score(2); },
+    L: [{ on: 'enterShadow', r: 'self', run(a) {
+      const m = a.mem();
+      if (!m.ch) return;
+      const t = a.bldNear(a.k, (b, c) => c.tags.includes('Cold') || c.tags.includes('Power'), 1).find((b) => a.canRepeat(b));
+      if (t && a.repeat(t)) { m.ch--; a.score(4); }
+    } }],
+    rb: { p: 2, rel: 1, react: { p: 4, rate: 0.25 }, u2: 5, why: 'Bridges the day/night seam for Cold and Power districts.' },
+  },
+  {
+    id: 'spectral_splitter', n: 'Spectral Splitter', cl: 'helio', t: 'M', r: 'U', tags: ['Light', 'Crystal'], trig: 'sunlit', pts: 3, mirror: true, cost: { AL: 4, DA: 4 },
+    text: 'While Sunlit, lights its Shadowed neighbours. Every Sunlit Turn: +3 per Crystal within range 2 (max 3); +2 if there are none.',
+    run(a) { const n = resCount(a, 'Crystal', 2, 3); a.score(n ? 3 * n : 2); },
+    rb: { p: 5, rel: 1, passive: { p: 2, rate: 0.5 }, why: 'Light relay that turns Crystal seams into a solar district.' },
+  },
+  {
+    id: 'perihelion_catcher', n: 'Perihelion Catcher', cl: 'cryo', t: 'M', r: 'U', tags: ['Cold', 'Orbital'], trig: 'every', every: 3, pts: 2, cost: { CY: 4, CR: 3 },
+    text: 'Can dock in Orbit. Reactive: When a Hot hex cools within range 2, condense Water next to it, +5. Every 3 turns: chill a Hot hex within range 2 (+2).',
+    L: [{ on: 'cool', r: 2, run(a, b, ev) { if (a.create('Water', ev.k, 1)) a.score(5); } }],
+    run(a) { const k = a.near(a.k, 2).find((x) => a.st(x, 'Hot')); if (k) { a.rmSt(k, 'Hot'); a.score(2); } },
+    rb: { p: 2, rel: 0.5, react: { p: 5, rate: 0.35 }, u2: 2, why: 'Turns waste heat into Water.' },
+  },
+  {
+    id: 'isotope_distillery', n: 'Isotope Distillery', cl: 'cryo', t: 'M', r: 'U', tags: ['Ice', 'Fuel'], trig: 'every', every: 2, pts: 6, cost: { CY: 5, DA: 3 },
+    text: 'Every 2 turns: Distil an adjacent Water or Gas into Fuel, +6 (+3 more on Ice-rich worlds, Ice 4+).',
+    run(a) {
+      const k = firstRes(a, ['Water', 'Gas'], 1);
+      if (!k) return;
+      a.transform(k, 'Fuel');
+      a.score(6 + ((a.S.profile && a.S.profile.ice >= 4) ? 3 : 0));
+    },
+    rb: { p: 7, rel: 0.75, u: 2, why: 'Fuel converter that loves cryo worlds.' },
+  },
+  {
+    id: 'loam_choir', n: 'Loam Choir', cl: 'verd', t: 'M', r: 'U', tags: ['Bio', 'Soil'], trig: 'event', cost: { GE: 5, DA: 2 },
+    text: 'Reactive: When Biomass appears within range 2 of Bio-Loam, +4; once per turn also repeat an adjacent Bio building.',
+    L: [{ on: 'create', r: 2, run(a, b, ev) {
+      if (ev.res !== 'Biomass' || !a.resNear(ev.k, 'Loam', 2).length) return;
+      a.score(4);
+      if (a.once('lc')) repeatOne(a, 'Bio', 1);
+    } }],
+    rb: { react: { p: 4, rate: 0.45 }, u2: 3, why: 'Doubles growth events on Bio-Loam worlds.' },
+  },
+  {
+    id: 'pollen_aerostat', n: 'Pollen Aerostat', cl: 'verd', t: 'M', r: 'U', tags: ['Bio', 'Orbital'], trig: 'every', every: 2, pts: 5, cost: { GE: 4, CR: 3 },
+    text: 'Can dock in Orbit. Every 2 turns: Pack a Biomass within range 2 into Cargo, +5 (+3 more if it sat on a Pressurized hex).',
+    run(a) {
+      const k = firstRes(a, 'Biomass', 2);
+      if (!k) return;
+      const p = a.st(k, 'Pressure');
+      a.transform(k, 'Cargo');
+      a.score(5 + (p ? 3 : 0));
+    },
+    rb: { p: 6, rel: 0.7, u: 2, why: 'Bridges Verdant growth into orbital trade.' },
+  },
+  {
+    id: 'priority_router', n: 'Priority Router', cl: 'syn', t: 'M', r: 'U', tags: ['Signal', 'Automation'], trig: 'turn', pts: 2, late: true, cost: { DA: 5, CR: 2 },
+    text: 'Every turn (after other timers): Repeat a building within range 2 that activated this turn, +2.',
+    run(a) { const t = a.lastActive(2); if (t && a.repeat(t)) a.score(2); },
+    rb: { p: 2, rel: 0.6, u: 2, why: 'A steady, targeted repeater with a small payout.' },
+  },
+  {
+    id: 'simulacrum_port', n: 'Simulacrum Port', cl: 'syn', t: 'M', r: 'U', tags: ['Drone', 'Echo'], trig: 'every', every: 2, pts: 2, cost: { AL: 4, DA: 4 },
+    text: 'Every 2 turns: +2 per distinct tag among adjacent buildings (max 6).',
+    run(a) {
+      const tags = new Set(a.bldNear(a.k, null, 1).flatMap((b) => a.cardOf(b).tags));
+      const n = Math.min(6, tags.size);
+      if (n) a.score(2 * n);
+    },
+    rb: { p: 9, rel: 0.7, why: 'Rewards dense, diverse districts.' },
+  },
+  {
+    id: 'goldleaf_recycler', n: 'Goldleaf Recycler', cl: 'wreck', t: 'M', r: 'U', tags: ['Salvage', 'Precious'], trig: 'event', cost: { AL: 4, CR: 4 },
+    text: 'Reactive: Once per turn, when Gold or Scrap is consumed within range 2, +7; Scrap counts as a Gold Vein for the Mint charter stamp.',
+    L: [{ on: 'consume', r: 2, run(a, b, ev) {
+      if ((ev.res === 'Gold' || ev.res === 'Scrap') && a.once('gl')) {
+        if (ev.res === 'Scrap') a.S.stats.precious++;
+        a.score(7);
+      }
+    } }],
+    rb: { react: { p: 7, rate: 0.45 }, u2: 1, why: 'Lets salvage chains feed a gold charter.' },
+  },
+  {
+    id: 'scuttle_permit', n: 'Scuttle Permit', cl: 'wreck', t: 'M', r: 'U', tags: ['Salvage', 'Culture'], trig: 'every', every: 3, pts: 3, cost: { CR: 5, AL: 3 },
+    text: 'Every 3 turns: +3 per adjacent Habitat (min +3). Ability (once per era): Dismantle a building within range 2 and return its card to your hand, +4.',
+    run(a) { a.score(3 * Math.max(1, countNear(a, 'Habitat', 1, 3))); },
+    ability: {
+      label: 'Dismantle', target: 'bld', range: 2,
+      valid: (a, b) => b.id !== a.b.id && b.c !== 'beacon',
+      run(a, k) { const t = a.bldAt(k); const cid = t.c; a.destroy(t); a.toHand(cid); a.score(4); },
+    },
+    rb: { p: 4, rel: 1, ability: { p: 4, u: 6 }, why: 'Rebuild a misplaced building somewhere better.' },
+  },
+  {
+    id: 'trade_sling', n: 'Trade-Sling Array', cl: 'kep', t: 'M', r: 'U', tags: ['Orbit', 'Cargo'], trig: 'every', every: 2, pts: 2, cost: { AL: 5, CY: 4 },
+    text: 'Reactive: The first Cargo launched anywhere each turn scores +6. Every 2 turns: pack a loose resource within range 2 into Cargo, +2.',
+    L: [{ on: 'launch', r: 'map', run(a) { if (a.once('ts')) a.score(6); } }],
+    run(a) { if (convert(a, looseAny, 'Cargo', 2)) a.score(2); },
+    rb: { p: 2, rel: 0.6, u: 1.5, react: { p: 6, rate: 0.35 }, why: 'Map-wide launch payoff.' },
+  },
+  {
+    id: 'lane_survey_probe', n: 'Lane Survey Probe', cl: 'kep', t: 'M', r: 'U', tags: ['Signal', 'Orbit'], trig: 'event', cost: { DA: 4, CR: 4 },
+    text: 'On Build: +3 per meteor still forecast this map (max 4). Reactive: Each meteor impact anywhere scores +6 and counts as a Cargo launch for the Trade charter stamp.',
+    build(a) { a.score(3 * Math.min(4, Math.max(1, a.S.events.filter((e) => !e.done && e.type === 'meteor').length))); },
+    L: [{ on: 'impact', r: 'map', run(a) { a.S.stats.launched++; a.score(6); } }],
+    rb: { once: 9, react: { p: 6, rate: 0.2 }, u2: 3, why: 'Turns meteor showers into trade progress.' },
+  },
+  {
+    id: 'mint_atrium', n: 'Mint Atrium', cl: 'hearth', t: 'M', r: 'U', tags: ['Habitat', 'Precious'], trig: 'every', every: 2, pts: 3, cost: { CR: 5, AL: 3 },
+    text: 'Reactive: When Gold is extracted within range 2, +5 (+3 more if this is Pressurized). Every 2 turns: +3 per adjacent Pressurized Habitat (max 2).',
+    L: [{ on: 'extract', r: 2, run(a, b, ev) { if (ev.res === 'Gold') a.score(5 + (a.st(a.k, 'Pressure') ? 3 : 0)); } }],
+    run(a) { const n = countNear(a, (b) => pHabitat(a, b), 1, 2); if (n) a.score(3 * n); },
+    rb: { p: 3, rel: 0.6, react: { p: 6.5, rate: 0.3 }, why: 'Gold commerce for habitat districts.' },
+  },
+  {
+    id: 'quarantine_market', n: 'Quarantine Market', cl: 'hearth', t: 'M', r: 'U', tags: ['Trade', 'Shield'], trig: 'every', every: 3, pts: 3, cost: { GE: 4, CR: 3 },
+    text: 'Shields adjacent Bio buildings. Reactive: Each Cargo arrival in orbit scores +5. Every 3 turns: +3 per adjacent Bio building (max 2).',
+    shields: (a, self, k) => { const b = a.bldAt(k); return a.dist(self.k, k) === 1 && !!b && a.has(b, 'Bio'); },
+    L: [{ on: 'arrival', r: 'map', run(a) { a.score(5); } }],
+    run(a) { const n = countNear(a, 'Bio', 1, 2); if (n) a.score(3 * n); },
+    rb: { p: 3, rel: 0.6, react: { p: 5, rate: 0.35 }, passive: { p: 0, u: 1, rate: 0.5 }, why: 'Trade income plus protection for gardens.' },
+  },
+  {
+    id: 'veil_interferometer', n: 'Veil Interferometer', cl: 'umbra', t: 'M', r: 'U', tags: ['Exotic', 'Signal'], trig: 'event', cost: { DA: 6, CY: 2 },
+    text: 'Reactive: Once per turn, when Radiation appears within range 2, repeat a building within range 2, +5, and irradiate this hex.',
+    L: [{ on: 'radiation', r: 2, run(a) { if (a.once('vi') && repeatOne(a, null, 2)) { a.score(5); a.addSt(a.k, 'Radiation'); } } }],
+    rb: { react: { p: 5, rate: 0.3 }, u2: 5, cost: 1, why: 'Radiation becomes a repeat trigger.' },
+  },
+  {
+    id: 'history_splicer', n: 'History Splicer', cl: 'umbra', t: 'M', r: 'U', tags: ['Time', 'Salvage'], trig: 'every', every: 3, pts: 2, cost: { DA: 5, CR: 5 },
+    text: 'Reactive: When a building within range 2 is destroyed, +8 and draw a card. Every 3 turns: repeat the building within range 2 that last activated, +2.',
+    L: [{ on: 'destroy', r: 2, run(a, b, ev) { if (ev.card !== 'beacon') { a.draw(1); a.score(8); } } }],
+    run(a) { const t = a.lastActive(2); if (t && a.repeat(t)) a.score(2); },
+    rb: { p: 2, rel: 0.6, u: 4, react: { p: 8, rate: 0.12 }, u2: 3, why: 'Loss becomes momentum.' },
+  },
+];
+
 export const BEACON = {
   id: 'beacon', n: 'Charter Beacon', cl: 'neutral', t: 'E', r: 'C', tags: ['Beacon'], trig: 'passive',
   text: 'The landing zone. Integrate charter stamp: connect buildings from all three active clans into the Beacon\'s network.',
 };
 
 export const CARDS = {};
-for (const c of list) {
+for (const c of list.concat(foundry)) {
   c.L = c.L || [];
   CARDS[c.id] = c;
 }
+for (const c of foundry) c.shop = true;
 CARDS.beacon = Object.assign(BEACON, { L: [] });
 
 export const CARD_LIST = list;
 export const clanCards = (cl) => list.filter((c) => c.cl === cl);
+export const FOUNDRY_LIST = foundry;
 export function canRepeatCard(c) { return !!(c.run || c.build); }

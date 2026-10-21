@@ -146,7 +146,7 @@ export function genColony(opts) {
     hand: [], bonusDraw: 0,
     events: [], checkpoints: checkpointsFor(turns, opts.diff || 1),
     stats: { precious: 0, alloy: 0, icewater: 0, biomass: 0, exotic: 0, habitat: 0, launched: 0, placed: 0, acts: 0, repeats: 0, destroyed: 0, excavated: 0, impacts: 0, cooled: 0, triTurns: 0 },
-    feed: [], tstat: null, status: 'play', result: null, boss: null,
+    feed: [], tstat: null, status: 'play', result: null, boss: null, techs: [], techOffer: null, mega: {},
     name: opts.name || 'Colony', profile, type: opts.type || 'prospect', prestamp: false,
   };
   Object.defineProperty(S, '_q', { value: [], enumerable: false, writable: true, configurable: true });
@@ -182,16 +182,26 @@ export function genColony(opts) {
     }
   }
 
-  // Preparations bought on the star chart.
+  // Preparations, clan enhancements and finale supply bought on the star chart.
   applyPreps(S, opts.preps || [], rng);
+  const handBonus = applyEnhancements(S, opts.enh || {}, rng);
+  applySupply(S, opts.supply || [], rng);
   S.seed = rng.seed;
 
   resetTurnState(S);
   // Opening hand: each clan's starter producer plus one random draw.
+  // Smaller treaties get extra Early draws so the opening hand holds 3+ cards.
   for (const cl of S.clans) S.hand.push(STARTERS[cl]);
-  const extra = drawOne(S, { tier: 'E' });
-  if (extra) S.hand.push(extra);
+  for (let i = 0; i < Math.max(1, 3 - S.clans.length); i++) {
+    const extra = drawOne(S, { tier: 'E' });
+    if (extra) S.hand.push(extra);
+  }
+  for (const cid of handBonus) if (S.hand.length < 5) S.hand.push(cid);
   if (opts.loaner && !S.hand.includes(opts.loaner)) S.hand.push(opts.loaner);
+  for (const cid of S.supplyCards || []) if (S.hand.length < 5) S.hand.push(cid);
+  if (opts.dispatch && !S.hand.includes(opts.dispatch)) S.hand.push(opts.dispatch);
+  // A bonus draw bought by a Trade Charter is dealt now (turn 1).
+  if (S.bonusDraw) { for (let i = 0; i < S.bonusDraw; i++) { const x = drawOne(S); if (x && S.hand.length < 5) S.hand.push(x); } S.bonusDraw = 0; }
   return S;
 }
 
@@ -213,7 +223,70 @@ export const PREPS = {
   gene: { n: 'Gene Seed Vault', cost: { GE: 2 }, d: 'Bio-Loam and an Organic Seam near the landing zone.' },
   insurance: { n: 'Hazard Insurance', cost: { CR: 2, AL: 2 }, d: 'Negate the first Integrity loss.' },
   charter: { n: 'Consolidated Charter', cost: { CR: 3, AL: 2 }, d: 'The Specialize charter stamp starts complete.' },
+  buoy: { n: 'Orbital Survey Buoy', cost: { DA: 2, AL: 1 }, d: 'A neutral Tether Node joins your opening hand – it docks in Orbit and links the ring.' },
+  diversion: { n: 'Meteor Diversion Permit', cost: { DA: 3, CY: 1 }, d: 'Cancel the first meteor or comet of the map.' },
+  shuttle: { n: 'Emergency Shuttle', cost: { CY: 3, CR: 2 }, d: 'If this colony fails, the site is not stranded: no Pressure penalty and you salvage 3 CR.' },
+  dispatch: { n: 'Special Blueprint Dispatch', cost: { CR: 4, DA: 2 }, d: 'Your most-favored (or newest Foundry) card for an active clan starts in your opening hand.' },
 };
+
+// Clan Enhancements (Directorate): visible head starts while the clan is active.
+export const ENHANCE = {
+  iron: [{ n: 'Survey Charges', d: 'An Ore and a Gold Vein near the landing zone.' }, { n: 'Bedrock Doctrine', d: '+1 Integrity and a Gravity Anchor in the opening hand.', card: 'gravity_anchor' }],
+  helio: [{ n: 'Focal Field', d: 'A Crystal and an Ice deposit near the landing zone.' }, { n: 'Mirror Kit', d: 'A Thermal Mirror in the opening hand.', card: 'thermal_mirror' }],
+  cryo: [{ n: 'Cold Basin', d: 'An Ice deposit and a permanently Shadowed hex near the landing zone.' }, { n: 'Trap Line', d: 'A Frost Trap in the opening hand.', card: 'frost_trap' }],
+  verd: [{ n: 'Seed Bank', d: 'A Bio-Loam patch next to the landing zone.' }, { n: 'Algae Starter', d: 'An Algae Tank in the opening hand and Water nearby.', card: 'algae_tank' }],
+  syn: [{ n: 'Lattice Seeds', d: 'Two Crystals near the landing zone.' }, { n: 'Relay Kit', d: 'A Relay Pylon in the opening hand.', card: 'relay_pylon' }],
+  wreck: [{ n: 'Salvage Rights', d: 'A Wreckage deposit next to the landing zone.' }, { n: 'Scrap Hoard', d: 'Two Scrap tokens and a Scrap Picker in the opening hand.', card: 'scrap_picker' }],
+  kep: [{ n: 'Cargo Depot', d: 'Water and Ore near the landing zone.' }, { n: 'Tether Kit', d: 'A Tether Node in the opening hand.', card: 'tether_node' }],
+  hearth: [{ n: 'Settler Domes', d: 'The landing ring starts Pressurized.' }, { n: 'Galley Crew', d: 'A Community Galley in the opening hand.', card: 'community_galley' }],
+  umbra: [{ n: 'Rift Survey', d: 'An Exotic Anomaly near the landing zone.' }, { n: 'Ward Kit', d: 'A Rift Ward in the opening hand.', card: 'rift_ward' }],
+};
+function applyEnhancements(S, enh, rng) {
+  const cards = [];
+  for (const cl of S.clans) {
+    const lv = enh[cl] || 0;
+    if (lv >= 1) {
+      if (cl === 'iron') { placeNear(S, 'Ore', rng); placeNear(S, 'Gold', rng); }
+      if (cl === 'helio') { placeNear(S, 'Crystal', rng); placeNear(S, 'Ice', rng); }
+      if (cl === 'cryo') {
+        placeNear(S, 'Ice', rng);
+        const k = H.near(S.R, '0,0', 2).find((x) => isFree(S, x));
+        if (k) S.hexes[k].st.Shade = 99;
+      }
+      if (cl === 'verd') placeNear(S, 'Loam', rng, 1);
+      if (cl === 'syn') { placeNear(S, 'Crystal', rng); placeNear(S, 'Crystal', rng); }
+      if (cl === 'wreck') placeNear(S, 'Wreck', rng, 1);
+      if (cl === 'kep') { placeNear(S, 'Water', rng); placeNear(S, 'Ore', rng); }
+      if (cl === 'hearth') for (const k of H.near(S.R, '0,0', 1)) if (S.hexes[k].kind !== 'rock') S.hexes[k].st.Pressure = 99;
+      if (cl === 'umbra') placeNear(S, 'Anomaly', rng);
+    }
+    if (lv >= 2) {
+      cards.push(ENHANCE[cl][1].card);
+      if (cl === 'iron') { S.integrity++; S.maxIntegrity++; }
+      if (cl === 'verd') placeNear(S, 'Water', rng);
+      if (cl === 'wreck') { placeNear(S, 'Scrap', rng); placeNear(S, 'Scrap', rng); }
+    }
+  }
+  return cards;
+}
+
+// Finale Supply Tokens (bought at the Veil with sealed cargo bundles).
+export const SUPPLY = {
+  reinforced: { n: 'Reinforced Landing', cost: { AL: 3 }, d: '+1 Integrity, the landing ring starts Stable and a Gravity Anchor joins your opening hand.' },
+  thermal: { n: 'Thermal Reserve', cost: { CY: 3 }, d: 'The first boss hazard (Mantle Roar, Fracture Tide or Wild Growth wave) fizzles.' },
+  bio: { n: 'Bio Containment', cost: { GE: 3 }, d: 'A Bio-Loam patch near the landing zone and Hazard Insurance for the first Integrity loss.' },
+  predictive: { n: 'Predictive Array', cost: { DA: 3 }, d: 'Reveal every buried surface deposit and see the whole event forecast.' },
+  trade: { n: 'Trade Charter', cost: { CR: 5 }, d: 'One bonus card on turns 1, 5 and 10.' },
+};
+function applySupply(S, sup, rng) {
+  for (const id of sup) {
+    if (id === 'reinforced') { S.integrity++; S.maxIntegrity++; for (const k of H.near(S.R, '0,0', 1)) { delete S.hexes[k].st.Unstable; S.hexes[k].st.Stable = 99; } S.supplyCards = (S.supplyCards || []).concat('gravity_anchor'); }
+    if (id === 'thermal' && S.boss) S.boss.ward = 1;
+    if (id === 'bio') { placeNear(S, 'Loam', rng); S.insurance++; }
+    if (id === 'predictive') { for (const k of H.shape(S.R).land) if (S.hexes[k].kind !== 'rock') S.hexes[k].hid = false; S.fullForecast = true; }
+    if (id === 'trade') { S.tradeCharter = [5, 10]; S.bonusDraw++; }
+  }
+}
 
 function applyPreps(S, preps, rng) {
   for (const p of preps) {
@@ -224,5 +297,8 @@ function applyPreps(S, preps, rng) {
     if (p === 'gene') { placeNear(S, 'Loam', rng); placeNear(S, 'Seam', rng); }
     if (p === 'insurance') S.insurance++;
     if (p === 'charter') S.prestamp = true;
+    if (p === 'buoy') S.supplyCards = (S.supplyCards || []).concat('tether_node');
+    if (p === 'diversion') { const e = S.events.find((x) => x.type === 'meteor' || x.type === 'comet'); if (e) e.done = true; }
+    if (p === 'shuttle') S.shuttle = true;
   }
 }

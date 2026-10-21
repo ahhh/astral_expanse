@@ -3,7 +3,10 @@ import { cardEl, cardText, trigLabel } from './cardview.js';
 import { CLANS, CLAN_IDS, CARD_LIST, RARITY, TIER } from '../engine/cards.js';
 import { rubric, BANDS, HORIZON } from '../engine/rubric.js';
 import { STARTERS } from '../engine/mapgen.js';
-import { CARDS } from '../engine/cards.js';
+import { CARDS, FOUNDRY_LIST } from '../engine/cards.js';
+import { DIFFICULTY, MODIFIERS } from '../engine/expedition.js';
+import { TECHS, MEGA } from '../engine/colony.js';
+import { hashStr } from '../engine/rng.js';
 import { MEASURED } from '../engine/measured.js';
 
 export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, onPractice, onCodex, onHelp }) {
@@ -11,7 +14,7 @@ export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, 
   root.append(h('div', { class: 'title' },
     h('div', { class: 'planet' }),
     h('div', { class: 'logo' }, 'Astral Expanse', h('small', null, 'The Far Trade')),
-    h('p', null, 'Sign a treaty with three of nine clans, build self-activating colonies on strange asteroids, weave them into a trade network, and reach a mythic superplanet before the frontier closes.'),
+    h('p', null, 'Set out with a single clan, build self-activating colonies on strange asteroids, win new clans at their Enclaves, weave a trade network and reach a mythic superplanet before the frontier closes.'),
     hasSave ? h('button', { class: 'btn primary block', onclick: onContinue }, `Continue – ${saveInfo}`) : null,
     h('button', { class: 'btn block' + (hasSave ? '' : ' primary'), onclick: onNew }, '🚀 New expedition'),
     h('button', { class: 'btn block', onclick: onPractice }, '🪐 Quick colony (single map)'),
@@ -19,7 +22,37 @@ export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, 
     meta && meta.runs ? h('p', { class: 'faint', style: { textAlign: 'center', marginTop: '10px' } }, `Expeditions: ${meta.runs} · victories: ${meta.wins} · best colony: ${meta.bestColony || 0} Influence`) : null));
 }
 
-export function clanSelect(root, { title, onStart, onBack, startLabel = 'Sign treaty' }) {
+// Expedition setup: difficulty, optional modifiers and the chart seed.
+export function setupScreen(root, { onBack, onNext }) {
+  let diff = 'standard';
+  const mods = new Set();
+  let seedMode = 'random';
+  let custom = '';
+  root.innerHTML = '';
+  const body = h('div', { class: 'page' });
+  const today = new Date().toISOString().slice(0, 10);
+  const draw = () => {
+    body.innerHTML = '';
+    body.append(h('div', { class: 'sect', style: { marginTop: 0 } }, 'Difficulty'),
+      h('div', { class: 'opt-grid' }, Object.entries(DIFFICULTY).map(([id, d]) => h('button', { class: 'opt' + (diff === id ? ' on' : ''), onclick: () => { diff = id; draw(); } }, h('h4', null, `${d.ic} ${d.n}`), h('p', null, d.d)))),
+      h('div', { class: 'sect' }, 'Modifiers (optional)'),
+      h('div', { class: 'opt-grid' }, Object.entries(MODIFIERS).map(([id, m]) => h('button', { class: 'opt' + (mods.has(id) ? ' on' : ''), onclick: () => { if (mods.has(id)) mods.delete(id); else mods.add(id); draw(); } }, h('h4', null, `${m.ic} ${m.n}`), h('p', null, m.d)))),
+      h('div', { class: 'sect' }, 'Star chart seed'),
+      h('div', { class: 'seg' }, [['random', '🎲 Random'], ['daily', `📅 Daily (${today})`], ['custom', '✏️ Custom']].map(([id, n]) => h('button', { class: 'btn small' + (seedMode === id ? ' on' : ''), onclick: () => { seedMode = id; draw(); } }, n))),
+      seedMode === 'custom' ? h('input', { class: 'field', placeholder: 'Any word or number – same seed, same chart', value: custom, oninput: (e) => { custom = e.target.value; } }) : '',
+      h('p', { class: 'faint', style: { fontSize: '12px' } }, 'The seed fixes the star chart, enclave locations and every world map, so friends can race the same expedition.'));
+  };
+  draw();
+  const go = () => {
+    const seed = seedMode === 'daily' ? hashStr('daily' + today) % 1e9 : seedMode === 'custom' && custom.trim() ? (/^\d+$/.test(custom.trim()) ? +custom.trim() % 1e9 : hashStr(custom.trim()) % 1e9) : (Math.random() * 1e9) | 0;
+    onNext({ difficulty: diff, mods: [...mods], seed, seedLabel: seedMode === 'daily' ? `Daily ${today}` : seedMode === 'custom' && custom.trim() ? custom.trim() : String(seed) });
+  };
+  root.append(h('div', { class: 'topbar' }, h('h2', null, 'New expedition'), h('div', { class: 'dim', style: { fontSize: '12px' } }, 'Tune the challenge, then pick your founding clan.')),
+    body,
+    h('div', { class: 'bottombar' }, h('button', { class: 'btn', onclick: onBack }, 'Back'), h('button', { class: 'btn primary grow', onclick: go }, 'Choose founding clan →')));
+}
+
+export function clanSelect(root, { title, onStart, onBack, startLabel = 'Sign treaty', min = 3, max = 3, hint }) {
   let picked = [];
   root.innerHTML = '';
   const grid = h('div', { class: 'clan-grid' });
@@ -31,16 +64,16 @@ export function clanSelect(root, { title, onStart, onBack, startLabel = 'Sign tr
       const on = picked.includes(id);
       grid.append(h('button', {
         class: 'clan-card' + (on ? ' on' : ''), '--cc': c.col,
-        onclick: () => { picked = on ? picked.filter((x) => x !== id) : picked.length < 3 ? picked.concat(id) : picked; draw(); },
+        onclick: () => { picked = on ? picked.filter((x) => x !== id) : max === 1 ? [id] : picked.length < max ? picked.concat(id) : picked; draw(); },
       }, h('div', { class: 'row' }, h('span', { class: 'ic' }, c.ic), h('h3', { class: 'grow' }, c.n), on ? h('b', null, '✓') : null),
       h('div', { class: 'faint', style: { fontSize: '11px' } }, c.s, ' · starter: ', CARDS[STARTERS[id]].n),
       h('p', null, c.d)));
     }
-    startBtn.disabled = picked.length !== 3;
-    startBtn.textContent = picked.length === 3 ? startLabel : `Pick ${3 - picked.length} more`;
+    startBtn.disabled = picked.length < min;
+    startBtn.textContent = picked.length >= min ? startLabel : `Pick ${min - picked.length} more`;
   };
   draw();
-  root.append(h('div', { class: 'topbar' }, h('h2', null, title), h('div', { class: 'dim', style: { fontSize: '12px' } }, 'Choose exactly three clans. They speak a shared tag language – mix them for cross-clan cascades.')),
+  root.append(h('div', { class: 'topbar' }, h('h2', null, title), h('div', { class: 'dim', style: { fontSize: '12px' } }, hint || 'Choose up to three clans. They speak a shared tag language – mix them for cross-clan cascades.')),
     h('div', { class: 'page' }, grid),
     h('div', { class: 'bottombar' }, h('button', { class: 'btn', onclick: onBack }, 'Back'), startBtn));
 }
@@ -54,9 +87,28 @@ export function codexScreen(root, { onBack }) {
   const draw = () => {
     seg.innerHTML = '';
     seg.append(h('button', { class: 'btn small' + (view === 'rubric' ? ' on' : ''), onclick: () => { view = 'rubric'; draw(); } }, '⚖️ Rubric'));
+    seg.append(h('button', { class: 'btn small' + (view === 'foundry' ? ' on' : ''), onclick: () => { view = 'foundry'; draw(); } }, '🔧 Foundry'));
+    seg.append(h('button', { class: 'btn small' + (view === 'systems' ? ' on' : ''), onclick: () => { view = 'systems'; draw(); } }, '🏗 Projects & tech'));
     for (const id of CLAN_IDS) seg.append(h('button', { class: 'btn small' + (view === 'cards' && clan === id ? ' on' : ''), style: { color: CLANS[id].col }, onclick: () => { view = 'cards'; clan = id; draw(); } }, CLANS[id].ic, ' ', CLANS[id].n.split(' ')[0]));
     body.innerHTML = '';
     if (view === 'rubric') return rubricView(body);
+    if (view === 'systems') {
+      body.append(h('h3', null, 'Mega-projects'), h('p', { class: 'dim' }, 'Recognized arrangements of buildings on a colony map. Completing one scores +12 and grants a lasting perk for that map.'));
+      body.append(h('div', { class: 'list' }, Object.values(MEGA).map((m) => h('div', { class: 'item' }, h('h4', null, `${m.ic} ${m.n}`), h('div', { class: 'faint', style: { fontSize: '12px' } }, 'Requires: ' + m.req), h('div', { class: 'dim', style: { fontSize: '12px' } }, m.d)))));
+      body.append(h('h3', { style: { marginTop: '16px' } }, 'Local technologies'), h('p', { class: 'dim' }, 'Each Influence checkpoint you meet (except the last) offers three; pick one. They vanish when the map ends.'));
+      body.append(h('div', { class: 'list' }, Object.values(TECHS).map((t) => h('div', { class: 'item' }, h('h4', null, `${t.ic} ${t.n}`), h('div', { class: 'dim', style: { fontSize: '12px' } }, t.d)))));
+      return;
+    }
+    if (view === 'foundry') {
+      body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, '18 shop-only blueprints (two per clan), bought in the Foundry tab of the star chart. They are Mid-tier Uncommons that open new interactions rather than out-classing base cards.'));
+      body.append(h('div', { class: 'list' }, FOUNDRY_LIST.map((c) => {
+        const r = rubric(c);
+        return h('div', { class: 'item codex-card', onclick: () => sheet({ title: c.n, body: h('div', null, cardEl(c.id, { big: true }), c.rb && c.rb.why ? h('p', { class: 'dim' }, 'Design note: ', c.rb.why) : null) }) },
+          h('div', null, h('b', { style: { color: CLANS[c.cl].col } }, CLANS[c.cl].ic, ' ', c.n), h('div', { class: 'faint', style: { fontSize: '11px' } }, `${trigLabel(c)} · ${c.tags.join(' · ')} · ${Object.entries(c.cost).map(([k, v]) => v + ' ' + k).join(' + ')}`), h('div', { class: 'tx dim', style: { fontSize: '12px' } }, cardText(c.text))),
+          h('div', { style: { textAlign: 'right' } }, h('div', { class: 'pp pill-' + c.r }, r.pp)));
+      })));
+      return;
+    }
     const cards = CARD_LIST.filter((c) => c.cl === clan);
     const tot = cards.reduce((s, c) => s + rubric(c).pp, 0);
     body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, CLANS[clan].d, ` Total rubric power ${tot.toFixed(0)} PP.`));
@@ -108,16 +160,21 @@ export function helpScreen(root, { onBack }) {
   root.append(h('div', { class: 'topbar' }, h('div', { class: 'row' }, h('button', { class: 'btn small', onclick: onBack }, '←'), h('h2', null, 'How to play'))),
     h('div', { class: 'page' },
       h('h3', null, 'The colony map'),
-      P('Each turn you build one card from your hand on an empty hex. Tap a card to see every legal hex with a forecast of the Influence it would earn this turn (the best three glow gold). Tap a hex to confirm. Tap a card again for its full text.'),
+      P('Each turn you build one card from your hand on an empty hex. Tap a card to see every legal hex with a forecast of the Influence it would earn (the best three glow gold). Tap a hex to confirm. Tap a card again for its full text. Misplaced something? Undo (if your difficulty allows it) rewinds the last placement.'),
       P('Buildings fire on triggers: On Build, every turn, every N turns, while Sunlit, or reactively when something happens nearby – a resource is created, consumed or transformed, a hex heats or cools, a meteor lands, and so on. One placement can set off a long cascade. Each building can activate at most twice per turn.'),
-      P('The asteroid rotates one quarter-turn each turn: the compass in the corner of the map shows where the sun is. Lit hexes are brighter, Shadow hexes darker. Caverns (excavated rock) are always in Shadow.'),
-      P('Natural deposits hold several units (shown as ×3, ×2). Converting one places the product on a free neighbouring hex and uses up one unit, so keep space around your deposits. Loose tokens such as Water or Metal are single units.'),
-      P('Meet each Influence checkpoint (shown in the HUD). Missing one costs 3 Integrity; missing the final one fails the colony. Meteors and other events are forecast – a red dashed ring marks the next impact.'),
-      P('You draw 1 card per turn, +1 if buildings from two of your clans activated, +1 more if all three did. Mid buildings unlock on turn 6 and Advanced on turn 11.'),
-      h('h3', null, 'Charters and the star chart'),
-      P('A secured colony becomes a trade node. Choose a charter: its shipment grows with the world\'s abundance and with two stamps – Specialize (a resource milestone) and Integrate (connect all three clans to the ★ Charter Beacon).'),
-      P('Build lanes back to the Arkship or a Freeport so colonies deliver their route yield on every jump. Spend world resources in the Directorate (bias your draws), on Preparations (change the next map), and at Freeports (exchange, swap clans).'),
-      P('Every jump raises Frontier Pressure. Collect Gate Shards at Gate Shrines, then choose one of three Mythic Superplanets for the finale before Pressure hits its limit.'),
+      P('The asteroid rotates one quarter-turn each turn: the compass shows where the sun is. Lit hexes are brighter, Shadow hexes darker. Caverns (excavated rock) are always in Shadow.'),
+      P('Natural deposits hold several units (shown as ×3, ×2). Converting one places the product on a free neighbouring hex, so keep space around your deposits.'),
+      P('Meet each Influence checkpoint. Missing one costs 3 Integrity; missing the final one fails the colony. Meeting one offers a local technology for the rest of the map. Arranging buildings into a mega-project (see Goals) scores a bonus and a lasting perk.'),
+      P('You draw 1 card per turn, +1 if two of your clans activated (or your only clan did), +1 more if all three did. Mid buildings unlock on turn 6 and Advanced on turn 11.'),
+      h('h3', null, 'Growing your treaty'),
+      P('You set out with one clan. Clan Enclaves on the star chart invite their resident clan onto that map; secure the colony and the clan joins your treaty, up to three active clans. With a full treaty an enclave clan replaces one of yours for that map and is licensed for later swaps at Freeports.'),
+      h('h3', null, 'Charters and the trade network'),
+      P('A secured colony becomes a trade node. Choose a charter: its shipment grows with the world\'s abundance and two stamps – Specialize (a resource milestone) and Integrate (every active clan connected to the ★ Charter Beacon).'),
+      P('Build lanes between claimed colonies, the Arkship and visited Freeports. Supplied colonies ship their route yield on every jump, limited by each lane\'s capacity. Three colonies of different charters joined in a loop form a trade ring and earn a Trade Compact. After Frontier Pressure 4, route crises are forecast a jump ahead: avert them, or fit lane upgrades that deflect them.'),
+      h('h3', null, 'Spending world resources'),
+      P('Clans tab: Presence, Favor and Bans bias your draws; Enhancements give each clan a visible head start. Foundry: shop-only blueprints. Fleet: one-shot Preparations for the next colony and permanent Fleet Yard upgrades. Goals: carry one sector contract at a time.'),
+      h('h3', null, 'The finale'),
+      P('Every jump raises Frontier Pressure. Collect three Gate Shards and reach 8 supplied throughput, then cross the Veil to one of three Mythic Superplanets. Your network converts into up to three Supply Tokens for the boss map. Win, and you can push on into the Endless Frontier.'),
       h('h3', null, 'Saving'),
       P('Progress saves automatically to this browser after every action. Clearing site data erases it.')));
 }

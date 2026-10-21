@@ -156,4 +156,4 @@ Art comes from `image_gen_pipeline` (`generate_astral_art.py` for cards, `genera
 
 ### Colony backdrops
 
-Drop a `art/maps/<id>.webp` in and the colony map shows it behind the asteroid at half opacity, cropped to cover. `<id>` is the planet type the colony is on: `prospect`, `bonanza`, `enclave`, `relay`, `derelict`, `observatory`, `fault`, `shrine`, or the superplanet `aurelia`, `nyxea`, `viridion`. Quick colonies from the title screen use `prospect`. A portrait image around 1024×1536 suits a phone; keep its middle dark and quiet, because the hex grid sits on top.
+Drop a `art/maps/<id>.webp` in and the colony map shows it behind the asteroid, muted (desaturated, dimmed, slightly blurred) and cropped to cover. `<id>` is the planet type the colony is on: `prospect`, `bonanza`, `enclave`, `relay`, `derelict`, `observatory`, `fault`, `shrine`, or the superplanet `aurelia`, `nyxea`, `viridion`. Quick colonies from the title screen use `prospect`. A portrait image around 1024×1536 suits a phone; keep its middle dark and quiet, because the hex grid sits on top.

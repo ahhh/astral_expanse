@@ -5,6 +5,7 @@ import { CARDS, CLANS, RARITY, TIER, clanCards } from '../engine/cards.js';
 import { WORLD, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import { rubric } from '../engine/rubric.js';
 import * as X from '../engine/expedition.js';
+import { planetIcon, isMissing, markMissing } from './art.js';
 
 const RES_ORDER = ['CR', 'AL', 'CY', 'GE', 'DA', 'GS'];
 const TABS = [['chart', '🗺️', 'Chart'], ['net', '🛰️', 'Network'], ['dir', '🏛️', 'Clans'], ['foundry', '🔧', 'Foundry'], ['fleet', '🚀', 'Fleet'], ['goals', '🎯', 'Goals']];
@@ -19,6 +20,9 @@ export function profileEl(p) {
   return h('div', { class: 'prof' }, FAMILIES.map((f) => [h('span', null, FAMILY_INFO[f].ic, ' ', FAMILY_INFO[f].n), pips(p[f])]));
 }
 const clanChip = (c, extra = '') => h('span', { class: 'chip', style: { color: CLANS[c].col, borderColor: CLANS[c].col } }, CLANS[c].ic, ' ', CLANS[c].n.split(' ')[0], extra);
+// Star-chart icon id for a node: superplanets and fogged worlds have their own art.
+const iconId = (E, n) => (!X.isSurveyed(E, n) ? 'unknown' : n.type === 'boss' ? n.boss : n.type);
+const nodeEmoji = (E, n) => (!X.isSurveyed(E, n) ? '❔' : n.type === 'enclave' ? CLANS[n.clan].ic : X.NODE_TYPES[n.type].ic);
 const costBtn = (E, label, cost, on, extra = {}) => h('button', { class: 'btn small', disabled: !X.canAfford(E, cost) || extra.disabled, onclick: on }, label, Object.keys(cost).length ? ` (${X.costText(cost)})` : ' (free)');
 
 export function overworldScreen(root, E, hooks, tab = 'chart') {
@@ -51,16 +55,19 @@ function chart(body, E, hooks) {
   const nodes = E.chart.nodes;
   const maxL = Math.max(...nodes.map((n) => n.layer));
   const Hgt = PAD * 2 + maxL * LH;
-  const pos = (n) => [24 + n.x * (W - 48), PAD + n.layer * LH];
+  // The chart climbs: the Arkship sits at the bottom and the Crown at the top.
+  const yOf = (L) => PAD + (maxL - L) * LH;
+  const pos = (n) => [24 + n.x * (W - 48), yOf(n.layer)];
   const reach = new Map(X.reachable(E).map((e) => [e.to, e]));
   const svg = s('svg', { viewBox: `0 0 ${W} ${Hgt}` });
   // Sector bands
   for (let L = 1; L <= maxL; L++) {
     const sct = X.sectorOf(L);
     if (sct === X.sectorOf(L - 1) && L !== 1) continue;
-    const y0 = PAD + (L - 0.5) * LH;
     let span = 1;
     while (L + span <= maxL && X.sectorOf(L + span) === sct) span++;
+    // The band runs from layer L (its bottom) up to layer L + span - 1.
+    const y0 = yOf(L + span - 1) - 0.5 * LH;
     svg.append(s('rect', { x: 0, y: y0, width: W, height: span * LH, fill: sct % 2 ? '#ffffff05' : 'transparent' }));
     svg.append(s('text', { x: 6, y: y0 + 13, class: 'sector-label' }, X.SECTORS[sct].n));
   }
@@ -81,15 +88,24 @@ function chart(body, E, hooks) {
   }
   for (const n of nodes) {
     const [x, y] = pos(n);
-    const t = X.NODE_TYPES[n.type];
     const known = X.isSurveyed(E, n);
     const cls = 'node-ring' + (reach.has(n.id) ? ' reach' : '') + (n.state === 'claimed' ? ' claimed' : '') + (n.state === 'stranded' ? ' stranded' : '') + (n.id === E.at ? ' here' : '') + (known ? '' : ' unknown');
-    const ic = !known ? '❔' : n.type === 'enclave' ? CLANS[n.clan].ic : t.ic;
     const nm = known ? n.name : 'Unsurveyed';
+    const r = n.type === 'boss' ? 21 : 17;
     const g = s('g', { class: 'node-c', onclick: () => nodeSheet(E, n, reach.get(n.id), hooks) },
-      s('circle', { cx: x, cy: y, r: n.type === 'boss' ? 21 : 17, class: cls }),
-      s('text', { x, y: y + 6, 'text-anchor': 'middle', 'font-size': n.type === 'boss' ? 19 : 16 }, ic),
-      s('text', { x, y: y + 31, 'text-anchor': 'middle', class: 'node-name' }, nm.length > 12 ? nm.slice(0, 11) + '…' : nm));
+      s('circle', { cx: x, cy: y, r, class: cls }),
+      s('text', { x, y: y + r + 14, 'text-anchor': 'middle', class: 'node-name' }, nm.length > 12 ? nm.slice(0, 11) + '…' : nm));
+    const emoji = () => s('text', { x, y: y + 6, 'text-anchor': 'middle', 'font-size': n.type === 'boss' ? 19 : 16, 'pointer-events': 'none' }, nodeEmoji(E, n));
+    const src = planetIcon(iconId(E, n));
+    if (isMissing(src)) g.append(emoji());
+    else {
+      const ir = r * (n.type === 'boss' ? 1.25 : 1.15);
+      const im = s('image', { href: src, x: x - ir, y: y - ir, width: ir * 2, height: ir * 2, 'pointer-events': 'none', class: known ? null : 'fog' });
+      im.addEventListener('error', () => { markMissing(src); im.replaceWith(emoji()); });
+      g.append(im);
+    }
+    // Enclaves show whose world it is: the resident clan's badge on the planet.
+    if (known && n.type === 'enclave') g.append(s('circle', { cx: x - 13, cy: y + 12, r: 7, fill: '#0b0f1a', stroke: CLANS[n.clan].col, 'stroke-width': 1.5 }), s('text', { x: x - 13, y: y + 15.5, 'text-anchor': 'middle', 'font-size': 9, 'pointer-events': 'none' }, CLANS[n.clan].ic));
     if (n.connected && n.type !== 'ark') g.append(s('circle', { cx: x + 13, cy: y - 13, r: 4.5, fill: '#49d17d' }));
     if (n.state === 'claimed' && n.charges) g.append(s('text', { x: x + 20, y: y + 4, 'font-size': 9, 'font-weight': 700, fill: '#49d17d' }, `×${n.charges}`));
     svg.append(g);
@@ -97,7 +113,7 @@ function chart(body, E, hooks) {
   body.append(svg);
   requestAnimationFrame(() => {
     const [, y] = pos(X.node(E, E.at));
-    body.scrollTop = (y / Hgt) * body.scrollHeight - body.clientHeight / 3;
+    body.scrollTop = (y / Hgt) * body.scrollHeight - (body.clientHeight * 2) / 3;
   });
   const here = X.node(E, E.at);
   if (X.atHub(E)) {
@@ -111,7 +127,7 @@ function chart(body, E, hooks) {
 function nodeSheet(E, n, edge, hooks) {
   const t = X.NODE_TYPES[n.type];
   const known = X.isSurveyed(E, n);
-  const b = h('div', null);
+  const b = h('div', null, h('img', { class: 'planet-hero', alt: '', src: planetIcon(iconId(E, n)), onerror: (e) => e.target.remove() }));
   if (!known) {
     b.append(h('p', { class: 'dim', style: { marginTop: 0 } }, `Beyond your survey horizon (${X.surveyRange(E)} layers ahead). Its type, resources and hazards are unknown. A Survey Mast or a claimed Research Observatory extends the horizon.`));
   } else {

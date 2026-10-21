@@ -78,17 +78,18 @@ function nets(S) {
   const bs = bldList(S);
   const gates = bs.filter((b) => card(b).anomLink);
   const adj = new Map(bs.map((b) => [b.id, []]));
+  const pairs = [];
   for (let i = 0; i < bs.length; i++) {
     for (let j = i + 1; j < bs.length; j++) {
       const a = bs[i], b = bs[j];
       const d = H.dist(a.k, b.k);
-      let ok = d <= Math.max(linkR(a), linkR(b));
-      if (!ok && orbitish(S, a) && orbitish(S, b)) ok = true;
-      if (!ok && gates.length) {
+      let how = d === 1 ? 'adj' : d <= Math.max(linkR(a), linkR(b)) ? 'link' : null;
+      if (!how && orbitish(S, a) && orbitish(S, b)) how = 'orbit';
+      if (!how && gates.length) {
         const ag = card(a).anomLink, bg = card(b).anomLink;
-        if ((ag && nextToAnomaly(S, b)) || (bg && nextToAnomaly(S, a))) ok = true;
+        if ((ag && nextToAnomaly(S, b)) || (bg && nextToAnomaly(S, a))) how = 'gate';
       }
-      if (ok) { adj.get(a.id).push(b.id); adj.get(b.id).push(a.id); }
+      if (how) { adj.get(a.id).push(b.id); adj.get(b.id).push(a.id); pairs.push({ a: a.id, b: b.id, how }); }
     }
   }
   const m = {};
@@ -99,8 +100,14 @@ function nets(S) {
     for (let i = 0; i < comp.length; i++) for (const n of adj.get(comp[i])) if (!seen.has(n)) { seen.add(n); comp.push(n); }
     for (const id of comp) m[id] = comp;
   }
-  Object.defineProperty(S, '_nc', { value: { v: S.bver, m }, enumerable: false, configurable: true, writable: true });
+  Object.defineProperty(S, '_nc', { value: { v: S.bver, m, pairs }, enumerable: false, configurable: true, writable: true });
   return m;
+}
+// Every connected pair of buildings and how they connect ('adj', 'link' for
+// Link reach, 'orbit' for the orbital ring, 'gate' for an Uncertainty Gate).
+export function links(S) {
+  nets(S);
+  return S._nc.pairs;
 }
 export function network(S, b) {
   return (nets(S)[b.id] || [b.id]).filter((id) => id !== b.id).map((id) => S.blds[id]);

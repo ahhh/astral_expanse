@@ -40,7 +40,7 @@ From the title screen choose **🚀 New expedition**.
 
 ### 2. Read the star chart
 
-The **Chart** tab shows the Arkship Meridian at the top and the Mythic Crown at the bottom. Glowing worlds are the ones you can jump to next. You can only move forward, or sideways along a dashed lateral lane, which costs an extra point of Pressure. Tap a world to see its type, its resource profile (five pip bars), the mission length and difficulty, and the jump cost.
+The **Chart** tab climbs from the Arkship Meridian at the bottom to the Mythic Crown at the top. Glowing worlds are the ones you can jump to next. You can only move forward, or sideways along a dashed lateral lane, which costs an extra point of Pressure. Tap a world to see its type, its resource profile (five pip bars), the mission length and difficulty, and the jump cost.
 
 - 🏛️ **Clan Enclaves** are how your treaty grows. While you have a free slot, the resident clan joins you on that map, and if you secure the colony it **stays in your treaty**, up to three active clans. Once all three slots are full, the enclave clan replaces one of yours for that map only. Securing it then **licenses** the clan, and you can swap it in later at a Freeport.
 - 🔺 **Gate Shrines** give Gate Shards. ⚓ **Freeports** are not colonies: they are trading posts and network hubs. 📶 Relay Rocks, 💰 Bonanzas, 🛸 Derelicts, 🔭 Observatories and 🌋 Fault Worlds each trade risk for different rewards.
@@ -145,4 +145,15 @@ js/engine/rubric.js            Power Point rubric
 js/engine/ai.js                greedy bot (simulator and Hint button)
 tools/                         simulator, calibration and report scripts
 docs/BALANCE.md                rubric, method, results and full card tables
+art/cards/<card id>.webp       card illustrations
+art/tiles/b/<card id>.webp     building hex tiles (clipped to a hex under the initials)
+art/tiles/r/<resource>.webp    resource hex tiles
+art/planets/<id>.webp          star-chart icons: node types, superplanets, `unknown`
+art/maps/<type>.webp           optional colony backdrops, one per planet type (see below)
 ```
+
+Art comes from `image_gen_pipeline` (`generate_astral_art.py` for cards, `generate_astral_tiles.py` for tiles and planet icons). `js/ui/art.js` holds the paths; any missing image falls back to the old emoji or initials.
+
+### Colony backdrops
+
+Drop a `art/maps/<id>.webp` in and the colony map shows it behind the asteroid at half opacity, cropped to cover. `<id>` is the planet type the colony is on: `prospect`, `bonanza`, `enclave`, `relay`, `derelict`, `observatory`, `fault`, `shrine`, or the superplanet `aurelia`, `nyxea`, `viridion`. Quick colonies from the title screen use `prospect`. A portrait image around 1024×1536 suits a phone; keep its middle dark and quiet, because the hex grid sits on top.

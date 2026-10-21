@@ -5,16 +5,18 @@ import { CARDS, CLANS, RARITY, TIER } from '../engine/cards.js';
 import { RES, STATUS, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import * as HX from '../engine/hex.js';
 import {
-  isLit, legalHexes, forecast, playCard, passTurn, scrapCard, bldAt, bldList, network,
+  isLit, legalHexes, forecast, playCard, passTurn, scrapCard, bldAt, bldList, network, links,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
   SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone,
 } from '../engine/colony.js';
 import { bestMove } from '../engine/ai.js';
+import { buildingTile, resourceTile, mapBackdrop, isMissing, markMissing } from './art.js';
 
 const SZ = 10;
 const PHASES = [['🌅', 'Dawn'], ['☀️', 'High Sun'], ['🌇', 'Dusk'], ['🌑', 'Deep Night']];
 const KIND = { surface: 'Surface', cavern: 'Cavern', rock: 'Solid rock', orbit: 'Orbital slot' };
-const KIND_FILL = { surface: '#2b3652', cavern: '#45332b', rock: '#121722', orbit: '#151f38' };
+const KIND_FILL = { surface: '#2b3652', cavern: '#3a2519', rock: '#121722', orbit: '#151f38' };
+const NET_KEY = 'astral-expanse.showNet';
 
 export function colonyScreen(root, S, hooks) {
   let sel = null;
@@ -26,10 +28,15 @@ export function colonyScreen(root, S, hooks) {
   const undoUsed = {};
   const undoLeft = () => (snap ? (hooks.undo ?? 1) - (undoUsed[snap.turn] || 0) : 0);
 
+  let showNet = true;
+  try { showNet = localStorage.getItem(NET_KEY) !== '0'; } catch (e) { /* storage blocked */ }
+
   root.innerHTML = '';
   const hud = h('div', { class: 'hud' });
   const svgEl = s('svg', { role: 'img', 'aria-label': 'Colony map' });
-  const mapwrap = h('div', { class: 'mapwrap' }, svgEl);
+  // Optional backdrop art for this planet type (art/maps/<type>.webp); absent files just vanish.
+  const backdrop = h('img', { class: 'backdrop', alt: '', src: mapBackdrop(S.boss ? S.boss.type : S.type), onerror: (e) => e.target.remove() });
+  const mapwrap = h('div', { class: 'mapwrap' }, backdrop, svgEl);
   const handEl = h('div', { class: 'hand' });
   const actEl = h('div', { class: 'actions' });
   const tray = h('div', { class: 'tray' }, handEl, actEl);
@@ -42,8 +49,65 @@ export function colonyScreen(root, S, hooks) {
   const pts = keys.map((k) => HX.pixel(k, SZ));
   const minX = Math.min(...pts.map((p) => p[0])) - SZ * 1.4, maxX = Math.max(...pts.map((p) => p[0])) + SZ * 1.4;
   const minY = Math.min(...pts.map((p) => p[1])) - SZ * 1.6, maxY = Math.max(...pts.map((p) => p[1])) + SZ * 1.6;
-  svgEl.setAttribute('viewBox', `${minX} ${minY} ${maxX - minX} ${maxY - minY}`);
   svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  // Pan & zoom: drag to pan when zoomed, pinch or wheel to zoom, buttons for both.
+  // A drag swallows the click that ends it, so panning never opens a hex.
+  const base = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  const view = { z: 1, x: base.x + base.w / 2, y: base.y + base.h / 2 };
+  const ZMAX = 3.5;
+  function applyView() {
+    view.z = Math.max(1, Math.min(ZMAX, view.z));
+    const w = base.w / view.z, hh = base.h / view.z;
+    view.x = Math.max(base.x + w / 2, Math.min(base.x + base.w - w / 2, view.x));
+    view.y = Math.max(base.y + hh / 2, Math.min(base.y + base.h - hh / 2, view.y));
+    svgEl.setAttribute('viewBox', `${view.x - w / 2} ${view.y - hh / 2} ${w} ${hh}`);
+    zoomBtn.hidden = view.z <= 1.01;
+  }
+  const unitsPerPx = () => {
+    const r = svgEl.getBoundingClientRect();
+    return 1 / Math.min(r.width / (base.w / view.z), r.height / (base.h / view.z));
+  };
+  const ptrs = new Map();
+  let drag = null, pinch = null, dragged = false;
+  const spread = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+  svgEl.addEventListener('pointerdown', (e) => {
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 1) { drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; dragged = false; }
+    if (ptrs.size === 2) { pinch = { d: spread(), z: view.z }; dragged = true; }
+  });
+  svgEl.addEventListener('pointermove', (e) => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && ptrs.size === 2) { view.z = pinch.z * spread() / pinch.d; applyView(); return; }
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!dragged && Math.hypot(dx, dy) > 8 && view.z > 1.01) dragged = true;
+    if (dragged) { const u = unitsPerPx(); view.x = drag.vx - dx * u; view.y = drag.vy - dy * u; applyView(); }
+  });
+  const ptrEnd = (e) => {
+    ptrs.delete(e.pointerId);
+    if (ptrs.size < 2) pinch = null;
+    if (ptrs.size === 0) drag = null;
+  };
+  svgEl.addEventListener('pointerup', ptrEnd);
+  svgEl.addEventListener('pointercancel', ptrEnd);
+  svgEl.addEventListener('click', (e) => { if (dragged) { e.stopPropagation(); dragged = false; } }, true);
+  svgEl.addEventListener('wheel', (e) => { e.preventDefault(); view.z *= e.deltaY < 0 ? 1.15 : 1 / 1.15; applyView(); }, { passive: false });
+  const zoomBy = (f) => { view.z *= f; applyView(); };
+  const zoomBtn = h('button', { class: 'mapbtn', title: 'Reset zoom', 'aria-label': 'Reset zoom', onclick: () => { view.z = 1; applyView(); } }, '⤢');
+  const netBtn = h('button', { class: 'mapbtn' + (showNet ? ' on' : ''), title: 'Show networks', 'aria-label': 'Toggle network overlay', onclick: () => {
+    showNet = !showNet;
+    try { localStorage.setItem(NET_KEY, showNet ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    netBtn.classList.toggle('on', showNet);
+    drawMap();
+  } }, '🔗');
+  mapwrap.append(h('div', { class: 'mapctl' },
+    h('button', { class: 'mapbtn', title: 'Zoom in', 'aria-label': 'Zoom in', onclick: () => zoomBy(1.4) }, '+'),
+    h('button', { class: 'mapbtn', title: 'Zoom out', 'aria-label': 'Zoom out', onclick: () => zoomBy(1 / 1.4) }, '−'),
+    zoomBtn, netBtn,
+    h('button', { class: 'mapbtn', title: 'Map key', 'aria-label': 'Map key', onclick: () => mapKey() }, '?')));
+  applyView();
 
   const poly = (cx, cy, sz) => HX.corners(cx, cy, sz).map((p) => p.map((v) => v.toFixed(2)).join(',')).join(' ');
   const forecastCount = () => (S.fullForecast ? 99 : bldList(S).some((b) => CARDS[b.c].radar) ? 3 : 1);
@@ -77,48 +141,87 @@ export function colonyScreen(root, S, hooks) {
         S.boss ? h('span', { class: 'chip warn' }, `${BOSS_INFO[S.boss.type].meterName} ${S.boss.type === 'viridion' ? S.boss.clock + '/3' : S.boss.meter + '/' + BOSS_INFO[S.boss.type].max}`) : null));
   }
 
+  // Network colours: the Beacon's network is white (the Integrate stamp), the
+  // rest cycle through hues that read against every clan colour.
+  const NET_COLS = ['#6ee7ff', '#ffd166', '#ff7ab6', '#7dffb0', '#c9a2ff', '#ff9f43', '#b8f35a', '#ff6b6b'];
+  const ORBIT_R = (S.R + 1) * Math.sqrt(3) * SZ;
+
+  // A square tile image clipped to a pointy-topped hex of radius r. When the image
+  // is missing, `extra` (e.g. the initials badge) is dropped and `fallback()` drawn.
+  function tileImg(g, src, cx, cy, r, fallback, extra = []) {
+    if (isMissing(src)) { g.append(...fallback()); return; }
+    const w = Math.sqrt(3) * r;
+    const im = s('image', { href: src, x: cx - w / 2, y: cy - r, width: w, height: 2 * r, preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#hexclip)', 'pointer-events': 'none' });
+    im.addEventListener('error', () => { markMissing(src); im.remove(); extra.forEach((e) => e.remove()); g.append(...fallback()); });
+    g.append(im, ...extra);
+  }
+  // Cave-mouth arch: marks a Cavern hex whatever sits on it.
+  const caveMark = (cx, cy, r) => s('path', { d: `M${cx - r},${cy + r * 0.45} A${r} ${r} 0 0 1 ${cx + r},${cy + r * 0.45} Z`, fill: '#05070c', stroke: '#d29a62', 'stroke-width': 0.5, 'pointer-events': 'none' });
+
   function drawMap() {
     svgEl.innerHTML = '';
     const legal = sel != null ? new Set(legalHexes(S, S.hand[sel])) : null;
     const abilT = abil ? new Set(abil.targets) : null;
     const top = fc ? Object.entries(fc).sort((a, b) => b[1] - a[1]).slice(0, 3).filter((e) => e[1] > 0).map((e) => e[0]) : [];
     const targets = new Map(upcoming().filter((e) => e.k).map((e) => [e.k, e]));
-    const gBase = s('g'), gTop = s('g');
+    const defs = s('defs', null,
+      s('clipPath', { id: 'hexclip', clipPathUnits: 'objectBoundingBox' }, s('polygon', { points: '0.5,0 1,0.25 1,0.75 0.5,1 0,0.75 0,0.25' })),
+      s('pattern', { id: 'rockpat', width: 2.6, height: 2.6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(40)' },
+        s('rect', { width: 2.6, height: 2.6, fill: '#10141e' }), s('line', { x1: 0, y1: 0, x2: 0, y2: 2.6, stroke: '#262f42', 'stroke-width': 1 })));
+    const gBase = s('g'), gNet = s('g', { 'pointer-events': 'none' }), gTop = s('g');
+    // The orbital ring: every orbital slot shares one network.
+    gBase.append(s('circle', { cx: 0, cy: 0, r: ORBIT_R, fill: 'none', stroke: '#4a6aa8', 'stroke-width': 0.5, 'stroke-dasharray': '1.5 2', opacity: 0.6, 'pointer-events': 'none' }));
     for (const k of keys) {
       const hx = S.hexes[k];
       const [cx, cy] = HX.pixel(k, SZ);
       const g = s('g', { 'data-k': k });
-      g.append(s('polygon', { points: poly(cx, cy, SZ * 0.98), class: 'hex-base', fill: KIND_FILL[hx.kind], 'stroke-dasharray': hx.kind === 'orbit' ? '2 1.5' : null, stroke: hx.kind === 'orbit' ? '#4a6aa8' : null }));
+      g.append(s('polygon', { points: poly(cx, cy, SZ * 0.98), class: 'hex-base', fill: hx.kind === 'rock' ? 'url(#rockpat)' : KIND_FILL[hx.kind], 'stroke-dasharray': hx.kind === 'orbit' ? '2 1.5' : null, stroke: hx.kind === 'orbit' ? '#4a6aa8' : null }));
       if (hx.kind !== 'rock') {
         const lit = isLit(S, k);
         g.append(s('polygon', { points: poly(cx, cy, SZ * 0.98), fill: lit ? '#ffd27a' : '#000', 'fill-opacity': lit ? 0.09 : 0.38, 'pointer-events': 'none' }));
       } else {
-        g.append(s('text', { x: cx, y: cy + 2, 'text-anchor': 'middle', 'font-size': 5, fill: '#2c3546', 'pointer-events': 'none' }, '▲'));
+        g.append(s('polygon', { points: poly(cx, cy, SZ * 0.7), fill: 'none', stroke: '#2a3346', 'stroke-width': 0.6, 'pointer-events': 'none' }));
       }
-      if (hx.st.Hot) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.9), fill: 'none', stroke: '#ff7a45', 'stroke-width': 0.9, 'pointer-events': 'none' }));
-      if (hx.st.Cold) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.9), fill: 'none', stroke: '#7fd3ff', 'stroke-width': 0.9, 'pointer-events': 'none' }));
-      if (hx.st.Pressure) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.8), fill: '#49d17d', 'fill-opacity': 0.12, stroke: '#49d17d', 'stroke-width': 0.5, 'stroke-dasharray': '1 1', 'pointer-events': 'none' }));
+      if (hx.st.Pressure) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.9), fill: '#49d17d', 'fill-opacity': 0.14, 'pointer-events': 'none' }));
       const b = hx.b ? S.blds[hx.b] : null;
       if (b) {
         const c = CARDS[b.c];
-        if (b.c === 'beacon') {
-          g.append(s('polygon', { points: poly(cx, cy, SZ * 0.78), fill: '#e7ecf6', stroke: '#6ee7ff', 'stroke-width': 1, 'pointer-events': 'none' }));
-          g.append(s('text', { x: cx, y: cy + 2.6, 'text-anchor': 'middle', 'font-size': 8, 'pointer-events': 'none' }, '★'));
-        } else {
-          g.append(s('polygon', { points: poly(cx, cy, SZ * 0.8), fill: clanColor(c.cl), stroke: RARITY[c.r].col, 'stroke-width': c.r === 'C' ? 0.6 : 1.3, 'pointer-events': 'none', opacity: b.dis ? 0.45 : 1 }));
-          g.append(s('text', { x: cx, y: cy + 1.9, 'text-anchor': 'middle', 'font-size': 5.4, 'font-weight': 800, fill: '#08101c', 'font-family': 'Chakra Petch, sans-serif', 'pointer-events': 'none' }, abbr(c)));
-          if (b.acts) g.append(s('circle', { cx: cx + 5.2, cy: cy - 4.6, r: 1.3, fill: '#fff', 'pointer-events': 'none' }));
-          if (c.ability) {
-            const st = abilityState(S, b);
-            if (st && st.ok) g.append(s('text', { x: cx - 5.4, y: cy - 3.4, 'font-size': 3.6, 'pointer-events': 'none' }, '⚡'));
-          }
+        const beacon = b.c === 'beacon';
+        const col = beacon ? '#e7ecf6' : clanColor(c.cl);
+        g.append(s('polygon', { points: poly(cx, cy, SZ * 0.88), fill: col, stroke: beacon ? '#6ee7ff' : RARITY[c.r].col, 'stroke-width': beacon ? 1 : c.r === 'C' ? 0.5 : 1.1, 'pointer-events': 'none' }));
+        const lbl = beacon ? '★' : abbr(c);
+        const bw = 2.4 + lbl.length * 2.5;
+        const badge = [
+          s('rect', { x: cx - bw / 2, y: cy + 3.3, width: bw, height: 4, rx: 1.6, fill: '#08101ce6', stroke: col, 'stroke-width': 0.35, 'pointer-events': 'none' }),
+          s('text', { x: cx, y: cy + 6.3, 'text-anchor': 'middle', 'font-size': 3.2, 'font-weight': 800, fill: '#fff', 'font-family': 'Chakra Petch, sans-serif', 'pointer-events': 'none' }, lbl),
+        ];
+        tileImg(g, buildingTile(b.c), cx, cy, SZ * 0.79, () => [s('text', { x: cx, y: cy + (beacon ? 2.6 : 1.9), 'text-anchor': 'middle', 'font-size': beacon ? 8 : 5.4, 'font-weight': 800, fill: '#08101c', 'font-family': 'Chakra Petch, sans-serif', 'pointer-events': 'none' }, lbl)], badge);
+        if (b.dis) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.88), fill: '#000', 'fill-opacity': 0.55, 'pointer-events': 'none' }));
+        if (b.acts) g.append(s('circle', { cx: cx + 5.2, cy: cy - 4.6, r: 1.3, fill: '#fff', stroke: '#08101c', 'stroke-width': 0.4, 'pointer-events': 'none' }));
+        if (c.ability) {
+          const st = abilityState(S, b);
+          if (st && st.ok) g.append(s('text', { x: cx - 5.4, y: cy - 3.4, 'font-size': 3.6, 'pointer-events': 'none' }, '⚡'));
         }
       } else if (hx.res && !hx.hid) {
-        g.append(s('text', { x: cx, y: cy + 2.8, 'text-anchor': 'middle', 'font-size': 8, 'pointer-events': 'none' }, RES[hx.res].ic));
-        if (hx.amt > 1) g.append(s('text', { x: cx + 5.6, y: cy + 5.4, 'text-anchor': 'middle', 'font-size': 3.6, 'font-weight': 700, fill: '#e7ecf6', stroke: '#0b0f1a', 'stroke-width': 0.5, 'paint-order': 'stroke', 'pointer-events': 'none' }, '×' + hx.amt));
+        const dep = !!RES[hx.res].dep;
+        // Deposits fill the hex; loose tokens sit smaller inside a pale outline.
+        const r = dep ? SZ * 0.9 : SZ * 0.72;
+        if (!dep) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.8), fill: 'none', stroke: '#e7ecf6', 'stroke-opacity': 0.55, 'stroke-width': 0.5, 'stroke-dasharray': '1.2 0.8', 'pointer-events': 'none' }));
+        tileImg(g, resourceTile(hx.res), cx, cy, r, () => [s('text', { x: cx, y: cy + 2.8, 'text-anchor': 'middle', 'font-size': 8, 'pointer-events': 'none' }, RES[hx.res].ic)]);
+        if (hx.amt > 1) g.append(s('text', { x: cx + 5.6, y: cy + 5.4, 'text-anchor': 'middle', 'font-size': 3.6, 'font-weight': 700, fill: '#e7ecf6', stroke: '#0b0f1a', 'stroke-width': 0.6, 'paint-order': 'stroke', 'pointer-events': 'none' }, '×' + hx.amt));
+      } else if (hx.kind === 'cavern') {
+        g.append(caveMark(cx, cy + 0.5, 4.2));
       }
+      if (hx.kind === 'cavern') {
+        // Caverns keep an amber rim and a small cave mouth even when built on.
+        g.append(s('polygon', { points: poly(cx, cy, SZ * 0.95), fill: 'none', stroke: '#d29a62', 'stroke-width': 0.9, 'stroke-dasharray': '2.2 0.9', 'pointer-events': 'none' }));
+        if (b || (hx.res && !hx.hid)) g.append(caveMark(cx - 5.6, cy - 2.6, 1.5));
+      }
+      if (hx.st.Hot) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.93), fill: 'none', stroke: '#ff7a45', 'stroke-width': 0.9, 'pointer-events': 'none' }));
+      if (hx.st.Cold) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.93), fill: 'none', stroke: '#7fd3ff', 'stroke-width': 0.9, 'pointer-events': 'none' }));
+      if (hx.st.Pressure) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.84), fill: 'none', stroke: '#49d17d', 'stroke-width': 0.5, 'stroke-dasharray': '1 1', 'pointer-events': 'none' }));
       const icons = ['Radiation', 'Unstable', 'Stable', 'Shielded', 'Shade', 'Crack'].filter((n) => hx.st[n] && !(n === 'Shielded' && k === '0,0') && !(n === 'Stable' && k === '0,0'));
-      icons.slice(0, 3).forEach((n, i) => g.append(s('text', { x: cx - 4 + i * 4, y: cy + 7.2, 'text-anchor': 'middle', 'font-size': 3.2, 'pointer-events': 'none' }, STATUS[n].ic)));
+      icons.slice(0, 3).forEach((n, i, a) => g.append(s('text', { x: cx + (i - (a.length - 1) / 2) * 3.6, y: cy - 5.2, 'text-anchor': 'middle', 'font-size': 3, 'pointer-events': 'none' }, STATUS[n].ic)));
       g.append(s('polygon', { points: poly(cx, cy, SZ), class: 'hex-hit', onclick: () => tapHex(k) }));
       gBase.append(g);
       if (legal && legal.has(k)) {
@@ -134,8 +237,60 @@ export function colonyScreen(root, S, hooks) {
       if (abilT && abilT.has(k)) gTop.append(s('polygon', { points: poly(cx, cy, SZ * 0.94), class: 'legal top' }));
       if (targets.has(k)) gTop.append(s('polygon', { points: poly(cx, cy, SZ * 0.86), class: 'target-ring' }));
     }
-    svgEl.append(gBase, gTop, s('g', { id: 'fx' }));
+    if (showNet) drawNetworks(gNet);
+    svgEl.append(defs, gBase, gNet, gTop, s('g', { id: 'fx' }));
     drawCompass();
+  }
+
+  // Networks: each connected group gets a colour halo; adjacent members are
+  // joined by a bridge across their shared edge, Link reach by a dashed line,
+  // Uncertainty Gate links by a magenta dotted line, and the orbital ring lights up.
+  function drawNetworks(gNet) {
+    const groups = [];
+    const seen = new Set();
+    for (const b of bldList(S)) {
+      if (seen.has(b.id)) continue;
+      const comp = [b, ...network(S, b)];
+      comp.forEach((x) => seen.add(x.id));
+      if (comp.length > 1) groups.push(comp);
+    }
+    // Biggest first, so colours stay put as small networks come and go.
+    groups.sort((a, b) => b.length - a.length || a[0].id - b[0].id);
+    const colOf = new Map();
+    let ci = 0;
+    for (const comp of groups) {
+      const col = comp.some((x) => x.c === 'beacon') ? '#ffffff' : NET_COLS[ci++ % NET_COLS.length];
+      comp.forEach((x) => colOf.set(x.id, col));
+    }
+    const pt = (b) => HX.pixel(b.k, SZ);
+    const orbitCol = links(S).find((l) => l.how === 'orbit');
+    if (orbitCol) gNet.append(s('circle', { cx: 0, cy: 0, r: ORBIT_R, fill: 'none', stroke: colOf.get(orbitCol.a), 'stroke-width': 0.9, 'stroke-dasharray': '3 2', opacity: 0.8 }));
+    for (const l of links(S)) {
+      const a = S.blds[l.a], b = S.blds[l.b];
+      const col = colOf.get(a.id);
+      const [x1, y1] = pt(a), [x2, y2] = pt(b);
+      if (l.how === 'adj') {
+        const lerp = (t) => [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+        const [p, q] = [lerp(0.36), lerp(0.64)];
+        gNet.append(s('line', { x1: p[0], y1: p[1], x2: q[0], y2: q[1], stroke: '#08101c', 'stroke-width': 2.8, 'stroke-linecap': 'round' }),
+          s('line', { x1: p[0], y1: p[1], x2: q[0], y2: q[1], stroke: col, 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
+      } else if (l.how === 'link' || l.how === 'gate') {
+        // Trimmed to start at each tile's edge, clear of the initials.
+        const d = Math.hypot(x2 - x1, y2 - y1) || 1;
+        const tx = ((x2 - x1) / d) * SZ * 0.62, ty = ((y2 - y1) / d) * SZ * 0.62;
+        gNet.append(s('line', { x1: x1 + tx, y1: y1 + ty, x2: x2 - tx, y2: y2 - ty, stroke: l.how === 'gate' ? '#d36bd6' : col, 'stroke-width': 0.8, 'stroke-dasharray': l.how === 'gate' ? '0.6 1.4' : '2.2 1.4', 'stroke-linecap': 'round', opacity: 0.9 }));
+      } else if (l.how === 'orbit') {
+        // Ground buildings that reach the ring get a spoke out to it.
+        for (const [x, y] of [[x1, y1], [x2, y2]]) {
+          const d = Math.hypot(x, y);
+          if (d < ORBIT_R - SZ) gNet.append(s('line', { x1: x, y1: y, x2: (x / (d || 1)) * ORBIT_R, y2: (y / (d || 1)) * ORBIT_R, stroke: col, 'stroke-width': 0.6, 'stroke-dasharray': '1 1.4', opacity: 0.7 }));
+        }
+      }
+    }
+    for (const [id, col] of colOf) {
+      const [cx, cy] = pt(S.blds[id]);
+      gNet.append(s('polygon', { points: poly(cx, cy, SZ * 0.93), fill: 'none', stroke: col, 'stroke-width': 0.8, 'stroke-opacity': 0.95 }));
+    }
   }
 
   // Sun compass: shows which side of the asteroid faces the sun.
@@ -348,7 +503,7 @@ export function colonyScreen(root, S, hooks) {
     const kv = h('div', { class: 'kv' },
       h('b', null, 'Terrain'), h('span', null, KIND[hx.kind]),
       hx.kind !== 'rock' ? [h('b', null, 'Light'), h('span', null, isLit(S, k) ? '☀️ Sunlit' : '🌑 Shadow')] : null,
-      hx.res && !hx.hid ? [h('b', null, 'Resource'), h('span', null, `${RES[hx.res].ic} ${RES[hx.res].n}${hx.amt > 1 ? ` (${hx.amt} units)` : ''} `, RES[hx.res].tags.map((t) => h('span', { class: 'tag' }, t)))] : null,
+      hx.res && !hx.hid ? [h('b', null, 'Resource'), h('span', null, h('img', { class: 'res-ic', src: resourceTile(hx.res), alt: '', onerror: (e) => e.target.remove() }), `${RES[hx.res].ic} ${RES[hx.res].n}${hx.amt > 1 ? ` (${hx.amt} units)` : ''} `, RES[hx.res].tags.map((t) => h('span', { class: 'tag' }, t)))] : null,
       hx.kind === 'rock' ? [h('b', null, 'Note'), h('span', null, 'Excavate to open a Cavern (always Shadowed). May hide a buried deposit.')] : null,
       hx.kind === 'orbit' ? [h('b', null, 'Note'), h('span', null, 'Only Orbit/Orbital buildings dock here. Orbital slots share one ring network and receive Cargo Arrivals.')] : null);
     body.append(kv);
@@ -403,6 +558,50 @@ export function colonyScreen(root, S, hooks) {
     if (e.sys) return h('div', { class: 'logline sys' }, e.sys);
     const c = CARDS[e.c];
     return h('div', { class: 'logline' + (e.rep ? ' rep' : '') }, h('span', { style: { color: clanColor(c.cl) } }, (e.rep ? '↻ ' : '') + c.n), h('span', { class: 'dim' }, e.note), h('span', { class: 'pts' }, e.pts ? '+' + e.pts : ''));
+  }
+
+  // The map key: every mark the map draws, drawn the same way.
+  function mapKey() {
+    const sw = (draw) => {
+      const v = s('svg', { viewBox: '-11 -11 22 22', width: 34, height: 34, class: 'key-sw' });
+      draw(v);
+      return v;
+    };
+    const hexP = (r) => poly(0, 0, r);
+    const terrain = (kind) => (v) => v.append(...[
+      s('defs', null, s('pattern', { id: 'kp' + kind, width: 2.6, height: 2.6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(40)' }, s('rect', { width: 2.6, height: 2.6, fill: '#10141e' }), s('line', { x1: 0, y1: 0, x2: 0, y2: 2.6, stroke: '#262f42', 'stroke-width': 1 }))),
+      s('polygon', { points: hexP(9.8), fill: kind === 'rock' ? `url(#kp${kind})` : KIND_FILL[kind], stroke: kind === 'orbit' ? '#4a6aa8' : '#0b0f1a', 'stroke-width': 0.6, 'stroke-dasharray': kind === 'orbit' ? '2 1.5' : null }),
+      kind === 'cavern' ? [caveMark(0, 0.5, 4.2), s('polygon', { points: hexP(9.5), fill: 'none', stroke: '#d29a62', 'stroke-width': 0.9, 'stroke-dasharray': '2.2 0.9' })] : null,
+      kind === 'rock' ? s('polygon', { points: hexP(7), fill: 'none', stroke: '#2a3346', 'stroke-width': 0.6 }) : null].flat().filter(Boolean));
+    const ring = (stroke, dash, fill) => (v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), fill ? s('polygon', { points: hexP(9), fill, 'fill-opacity': 0.14 }) : '', s('polygon', { points: hexP(9.3), fill: 'none', stroke, 'stroke-width': 0.9, 'stroke-dasharray': dash }));
+    const row = (swatch, name, desc) => h('div', { class: 'key-row' }, sw(swatch), h('div', null, h('b', null, name), h('div', { class: 'dim' }, desc)));
+    const body = h('div', null,
+      h('div', { class: 'sect' }, 'Terrain'),
+      row(terrain('surface'), 'Surface', 'Open ground. Most buildings go here.'),
+      row(terrain('cavern'), 'Cavern', 'Amber dashed rim and a cave mouth, which stay visible after you build or a deposit appears there. Always in Shadow. Made by excavating rock.'),
+      row(terrain('rock'), 'Solid rock', 'Hatched. Can’t be built on until excavated into a Cavern. May hide a buried deposit.'),
+      row(terrain('orbit'), 'Orbital slot', 'Dashed hexes on the outer ring. Only Orbit/Orbital buildings dock here.'),
+      h('div', { class: 'sect' }, 'Light & status'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('polygon', { points: hexP(9.8), fill: '#ffd27a', 'fill-opacity': 0.12 })), 'Sunlit', 'Slightly warm. Solar buildings fire here.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('polygon', { points: hexP(9.8), fill: '#000', 'fill-opacity': 0.38 })), 'Shadow', 'Darker. Cryo buildings fire here.'),
+      row(ring('#ff7a45'), 'Hot', 'Orange rim.'),
+      row(ring('#7fd3ff'), 'Cold', 'Blue rim.'),
+      row(ring('#49d17d', '1 1', '#49d17d'), 'Pressurized', 'Green tint and dotted rim.'),
+      h('p', { class: 'dim', style: { fontSize: '12px' } }, Object.entries(STATUS).filter(([n]) => !['Hot', 'Cold', 'Pressure'].includes(n)).map(([n, st]) => `${st.ic} ${n}`).join(' · ')),
+      h('div', { class: 'sect' }, 'Buildings & resources'),
+      row((v) => v.append(s('polygon', { points: hexP(8.8), fill: '#d98b45', stroke: '#ffbf3c', 'stroke-width': 1.1 }), s('rect', { x: -5, y: 3.3, width: 10, height: 4, rx: 1.6, fill: '#08101ce6', stroke: '#d98b45', 'stroke-width': 0.35 }), s('text', { x: 0, y: 6.3, 'text-anchor': 'middle', 'font-size': 3.2, 'font-weight': 800, fill: '#fff' }, 'PD')), 'Building', 'Clan-coloured frame, rarity-coloured edge, initials badge. White dot: activated this turn. ⚡: ability ready.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('text', { x: 0, y: 3, 'text-anchor': 'middle', 'font-size': 8 }, '🪨'), s('text', { x: 5.6, y: 6, 'font-size': 3.6, fill: '#e7ecf6', 'font-weight': 700 }, '×3')), 'Deposit', 'Fills its hex. ×N shows the units left.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('polygon', { points: hexP(8), fill: 'none', stroke: '#e7ecf6', 'stroke-opacity': 0.55, 'stroke-width': 0.5, 'stroke-dasharray': '1.2 0.8' }), s('text', { x: 0, y: 2.5, 'text-anchor': 'middle', 'font-size': 6 }, '🔩')), 'Loose token', 'Smaller, inside a pale dashed outline: made by buildings.'),
+      h('div', { class: 'sect' }, 'Networks (🔗 toggles)'),
+      row((v) => v.append(s('polygon', { points: hexP(9.3), fill: KIND_FILL.surface, stroke: '#ffd166', 'stroke-width': 0.9 }), s('line', { x1: -10, y1: 0, x2: 10, y2: 0, stroke: '#08101c', 'stroke-width': 2.8, 'stroke-linecap': 'round' }), s('line', { x1: -10, y1: 0, x2: 10, y2: 0, stroke: '#ffd166', 'stroke-width': 1.6, 'stroke-linecap': 'round' })), 'Connected', 'Each network has its own colour halo; bridges join adjacent members. The Beacon’s network is white.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('line', { x1: -9, y1: 5, x2: 9, y2: -5, stroke: '#6ee7ff', 'stroke-width': 0.8, 'stroke-dasharray': '2.2 1.4' })), 'Link reach', 'Dashed line: a Link building reaching 2+ hexes.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('line', { x1: -9, y1: 5, x2: 9, y2: -5, stroke: '#d36bd6', 'stroke-width': 0.8, 'stroke-dasharray': '0.6 1.4', 'stroke-linecap': 'round' })), 'Anomaly link', 'Dotted magenta: joined through an Uncertainty Gate.'),
+      row((v) => v.append(s('circle', { r: 8, fill: 'none', stroke: '#c9a2ff', 'stroke-width': 0.9, 'stroke-dasharray': '3 2' })), 'Orbital ring', 'Lights up in a network’s colour when orbital buildings connect; dotted spokes show ground buildings tied into it.'),
+      h('div', { class: 'sect' }, 'Placing'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('polygon', { points: hexP(9.2), class: 'legal top' })), 'Best hexes', 'Gold outline: top three forecasts. Cyan: any legal hex. Badge: 3-turn Influence estimate.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('polygon', { points: hexP(8.4), fill: 'none', stroke: '#ff6b6b', 'stroke-width': 1.1, 'stroke-dasharray': '2 1.4' })), 'Event target', 'Red dashed ring: a forecast meteor or comet lands here.'),
+      h('p', { class: 'faint', style: { fontSize: '12px' } }, 'Pinch, scroll or use + / − to zoom; drag to pan while zoomed.'));
+    sheet({ title: 'Map key', body });
   }
 
   function logSheet() {

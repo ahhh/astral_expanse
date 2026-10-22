@@ -57,7 +57,7 @@ L.push('## 3. Results');
 L.push('');
 const games = sim.games;
 L.push(`- Bot win rate on an ordinary sector-1 colony: **${Math.round((100 * sim.wins) / games)}%**; final Influence median **${sim.finals.slice().sort((a, b) => a - b)[Math.floor(games / 2)]}**.`);
-L.push(`- Checkpoint curve: need(t) = difficulty × (0.7t² + 1.5t) → ${[5, 10, 15, 20].map((t) => `T${t}: ${checkpointNeed(t, 1)}`).join(', ')} on sector 1. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).`);
+L.push(`- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t) → ${[5, 10, 15, 20].map((t) => `T${t}: ${checkpointNeed(t, 1)}`).join(', ')} on sector 1. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).`);
 L.push('');
 L.push('### Clan balance');
 L.push('');

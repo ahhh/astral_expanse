@@ -40,8 +40,8 @@ PP = OnBuild
 
 ## 3. Results
 
-- Bot win rate on an ordinary sector-1 colony: **95%**; final Influence median **434**.
-- Checkpoint curve: need(t) = difficulty × (0.7t² + 1.5t) → T5: 25, T10: 85, T15: 180, T20: 310 on sector 1. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).
+- Bot win rate on an ordinary sector-1 colony: **97%**; final Influence median **583**.
+- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t) → T5: 32, T10: 110, T15: 232, T20: 399 on sector 1. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).
 
 ### Clan balance
 
@@ -49,25 +49,25 @@ Average final Influence of every simulated colony whose trio included the clan.
 
 | Clan | Avg final Influence | vs. mean | Rubric total PP | Expected PP per draw |
 |---|---|---|---|---|
-| 🧠 Synapse Circuit | 456 | +4.1% | 421 | 25.1 |
-| 🛰️ Kepler Cartographers | 452 | +3.1% | 389 | 23.2 |
-| 🏠 Hearthline Compact | 450 | +2.7% | 413 | 24.9 |
-| ☀️ Heliarch Array | 450 | +2.5% | 386 | 23.0 |
-| 🔮 Umbra Institute | 442 | +0.9% | 397 | 23.8 |
-| ⛏️ Ironwake Union | 428 | -2.3% | 383 | 23.0 |
-| 🌱 Verdant Exodus | 424 | -3.3% | 395 | 23.6 |
-| ❄️ Cryostead Enclave | 422 | -3.8% | 397 | 23.5 |
-| ♻️ Wreckborn Fleet | 421 | -4.1% | 396 | 24.0 |
+| 🏠 Hearthline Compact | 622 | +5.4% | 403 | 24.4 |
+| 🛰️ Kepler Cartographers | 614 | +4.1% | 391 | 23.4 |
+| 🧠 Synapse Circuit | 609 | +3.3% | 421 | 25.1 |
+| ☀️ Heliarch Array | 586 | -0.7% | 395 | 23.7 |
+| ❄️ Cryostead Enclave | 584 | -1.0% | 400 | 23.8 |
+| 🔮 Umbra Institute | 582 | -1.4% | 401 | 23.9 |
+| ♻️ Wreckborn Fleet | 580 | -1.6% | 412 | 25.1 |
+| ⛏️ Ironwake Union | 569 | -3.5% | 385 | 23.2 |
+| 🌱 Verdant Exodus | 563 | -4.5% | 398 | 23.8 |
 
 ### Rarity tiers
 
 | Rarity | Rubric PP (mean) | Measured PP (mean) | Band |
 |---|---|---|---|
-| Common | 19.7 | 19.7 | 15–26 |
-| Uncommon | 28.9 | 28.9 | 24–34 |
-| Rare | 38.3 | 38.6 | 33–46 |
+| Common | 20.1 | 20.7 | 15–26 |
+| Uncommon | 28.8 | 29.1 | 24–34 |
+| Rare | 38.5 | 37.4 | 33–46 |
 
-Cards outside their band on the rubric: **0**. Cards whose measured PP is more than 10% outside their band: **0**.
+Cards outside their band on the rubric: **0**. Cards whose measured PP is more than 10% outside their band: **9**.
 
 ## 4. Method
 
@@ -96,25 +96,25 @@ PP = rubric Power Points · Meas. = measured PP · Act/turn = observed activatio
 
 ### ⛏️ Ironwake Union — Excavators
 
-Ore, Caverns, Alloy and Anchors. Take a deposit's value now or keep it for later.
+Ore, Caverns, Alloy and Anchors. Take a deposit's value now or keep it for later. Mine tunnels: Ironwake buildings on or beside a Cavern connect to every other building on or beside a Cavern.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Prospector Nail** | Mining · Signal | Every 3 | 18.2 | 17.8 | 0.46 | On Build: Reveal up to 3 buried deposits within range 2, +4 each (+2 more for Ore). Every 3 turns: reveal one more within range 3 (+4), or +2 if none remain. |
-| Early | Common | **Pit Drill** | Mining · Metal | Every 2 | 20.0 | 19.3 | 0.23 | Every 2 turns: Extract one unit of an Ore deposit within range 2 into Metal. +6 (+3 more for Gold). |
-| Early | Common | **Gravity Anchor** | Anchor · Structure | Every 3 | 23.3 | 22.5 | 0.40 | On Build: Make this and adjacent hexes Stable (+3 per Unstable hex fixed, min +2). Every 3 turns: +2 per adjacent building on a Stable hex (max 2). Adjacent Mining buildings score +2 when they activate. |
-| Early | Common | **Regolith Rake** | Mining · Dust | Every 2 | 17.3 | 16.0 | 0.23 | On Build: Clear up to 2 adjacent Regolith/Dust, +4 each. Every 2 turns: excavate a Rock hex within range 2 into a Cavern (+6); if none, clear a Regolith/Dust within range 2 (+5). |
-| Early | Uncommon | **Ore Shuttle** | Cargo · Link | Every 2 | 26.7 | 25.5 | 0.47 | Link. Reactive: Whenever a Metal-tagged resource (Ore, Gold, Metal, Scrap, Alloy) is consumed or extracted within range 2, +6. Every 2 turns: pack a Metal/Scrap/Alloy within range 2 into Cargo, +3. |
-| Mid | Common | **Mantle Cutter** | Mining · Heat | Every 2 | 21.4 | 15.7 | 0.16 | On Build: Excavate up to 2 adjacent Rock hexes into Hot Caverns, +7 each. Every 2 turns: excavate one more adjacent Rock (Hot), +7. |
-| Mid | Uncommon | **Magnetic Separator** | Metal · Industry | Every 2 | 30.5 | 29.0 | 0.57 | Reactive: When an Ore-tagged deposit is extracted within range 2, create a bonus Metal nearby, +5. Every 2 turns: +2 per Metal-tagged token within range 2 (max 3). |
-| Mid | Common | **Smelting Stack** | Metal · Heat | Every 2 | 16.3 | 16.6 | 0.30 | Every 2 turns: Turn a Metal or Scrap within range 2 into Alloy, +7, and heat this hex. Otherwise heat an adjacent empty hex, +2. |
-| Mid | Uncommon | **Seismic Geophone** | Signal · Mining | Reactive | 26.7 | 26.0 | 0.29 | Reactive (up to twice per turn): When a Cavern is excavated, a deposit is revealed or Ore is extracted within range 2, repeat a Mining building within range 2, +10. |
-| Mid | Common | **Slag Dump** | Waste · Dust | Every 2 | 17.1 | 17.2 | 0.67 | Reactive: When Alloy appears within range 2, drop Dust beside this, +2; when Metal appears, +1. Every 2 turns: +1 per Metal-tagged token within range 2 (max 4). |
-| Advanced | Uncommon | **Tunnel Spine** | Link · Structure | Every turn | 32.0 | 31.7 | 1.07 | Link. Mining buildings in its network score +2 whenever they activate. Every turn: +2 per Mining building in its network (max 2). |
-| Advanced | Rare | **Strip-Drill Array** | Mining · Impact | Every 2 | 34.7 | 33.7 | 0.40 | On Build: Extract up to 3 Ore units within range 2 into Metal, +10 each; one hex becomes Unstable. Every 2 turns: extract one more within range 2, +9. |
-| Advanced | Rare | **Forge Cathedral** | Industry · Metal | Every 2 | 40.3 | 42.8 | 0.59 | Reactive: Whenever Alloy appears within range 2, +14; whenever Metal appears, +6. Every 2 turns: +4 per Metal-tagged token within range 2 (max 4). |
-| Advanced | Uncommon | **Core Lattice** | Anchor · Link | Every 2 | 24.5 | 27.4 | 0.65 | On Build: Stabilize hexes within range 2; +2 per Unstable hex or Cavern stabilized (max +14). Mining buildings in its network get +1 range. Every 2 turns: +3 per Mining building in its network (max 3). |
-| Advanced | Rare | **Crustbreaker** | Mining · Impact | Every 2 | 33.6 | 32.7 | 0.31 | On Build: Excavate up to 3 Rock hexes within range 2 (revealing what is buried), +9 each; lose 2 Integrity (1 if beside an Anchor). Every 2 turns: excavate one more within range 2, +12. |
+| Early | Common | **Prospector Nail** | Mining · Signal | Every 3 | 18.2 | 18.1 | 0.45 | On Build: Reveal up to 3 buried deposits within range 2, +4 each (+2 more for Ore). Every 3 turns: reveal one more within range 3 (+4), or +2 if none remain. |
+| Early | Common | **Pit Drill** | Mining · Metal | Every 2 | 21.6 | 23.4 | 0.33 | Every 2 turns: Extract one unit of an Ore deposit within range 2 into Metal. +6 (+3 more for Gold). With no Ore in reach, it bores deeper once: its range grows by 1 for good, and Ore only the bore reaches scores +3. |
+| Early | Common | **Gravity Anchor** | Anchor · Structure | Every 3 | 23.3 | 25.5 | 0.40 | On Build: Make this and adjacent hexes Stable (+3 per Unstable hex fixed, min +2). Every 3 turns: +2 per adjacent building on a Stable hex (max 2). Adjacent Mining buildings score +2 when they activate. |
+| Early | Common | **Regolith Rake** | Mining · Dust | Every 2 | 17.3 | 16.1 | 0.24 | On Build: Clear up to 2 adjacent Regolith/Dust, +4 each. Every 2 turns: excavate a Rock hex within range 2 into a Cavern (+6); if none, clear a Regolith/Dust within range 2 (+5). |
+| Early | Uncommon | **Ore Shuttle** | Cargo · Link | Every 2 | 26.7 | 29.0 | 0.53 | Link. Reactive: Whenever a Metal-tagged resource (Ore, Gold, Metal, Scrap, Alloy) is consumed or extracted within range 2, +6. Every 2 turns: pack a Metal/Scrap/Alloy within range 2 into Cargo, +3. |
+| Mid | Common | **Mantle Cutter** | Mining · Heat | Every 2 | 22.5 | 21.9 | 0.61 | On Build: Excavate up to 2 adjacent Rock hexes into Hot Caverns, +7 each. Every 2 turns: excavate one more adjacent Rock (Hot), +7. With no Rock left, it taps the heat instead: +1 per adjacent Hot hex (max 2). |
+| Mid | Uncommon | **Magnetic Separator** | Metal · Industry | Every 2 | 30.5 | 30.7 | 0.62 | Reactive: When an Ore-tagged deposit is extracted within range 2, create a bonus Metal nearby, +5. Every 2 turns: +2 per Metal-tagged token within range 2 (max 3). |
+| Mid | Common | **Smelting Stack** | Metal · Heat | Every 2 | 16.3 | 17.1 | 0.30 | Every 2 turns: Turn a Metal or Scrap within range 2 into Alloy, +7, and heat this hex. Otherwise heat an adjacent empty hex, +2. |
+| Mid | Uncommon | **Seismic Geophone** | Signal · Mining | Reactive | 26.7 | 27.9 | 0.31 | Reactive (up to twice per turn): When a Cavern is excavated, a deposit is revealed or Ore is extracted within range 2, repeat a Mining building within range 2, +10. |
+| Mid | Common | **Slag Dump** | Waste · Dust | Every 2 | 17.1 | 17.3 | 0.74 | Reactive: When Alloy appears within range 2, drop Dust beside this, +2; when Metal appears, +1. Every 2 turns: +1 per Metal-tagged token within range 2 (max 4). |
+| Advanced | Uncommon | **Tunnel Spine** | Link · Structure | Every turn | 32.0 | 34.4 | 1.01 | Link. Mining buildings in its network score +2 whenever they activate. Every turn: +2 per Mining building in its network (max 2). |
+| Advanced | Rare | **Strip-Drill Array** | Mining · Impact | Every 2 | 34.7 | 29.0 | 0.28 | On Build: Extract up to 3 Ore units within range 2 into Metal, +10 each; one hex becomes Unstable. Every 2 turns: extract one more within range 2, +9. |
+| Advanced | Rare | **Forge Cathedral** | Industry · Metal | Every 2 | 40.3 | 46.2 | 0.69 | Reactive: Whenever Alloy appears within range 2, +14; whenever Metal appears, +6. Every 2 turns: +4 per Metal-tagged token within range 2 (max 4). |
+| Advanced | Uncommon | **Core Lattice** | Anchor · Link | Every 2 | 24.5 | 30.0 | 0.67 | On Build: Stabilize hexes within range 2; +2 per Unstable hex or Cavern stabilized (max +14). Mining buildings in its network get +1 range. Every 2 turns: +3 per Mining building in its network (max 3). |
+| Advanced | Rare | **Crustbreaker** | Mining · Impact | Every 2 | 33.6 | 29.6 | 0.27 | On Build: Excavate up to 3 Rock hexes within range 2 (revealing what is buried), +9 each; lose 2 Integrity (1 if beside an Anchor). Every 2 turns: excavate one more within range 2, +12. |
 
 ### ☀️ Heliarch Array — Sunforged
 
@@ -122,43 +122,43 @@ Sunlight, Heat and Power. Build for the next light phase, not only this turn.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Sunfoil Canopy** | Solar · Power | Sunlit | 22.5 | 23.6 | 0.77 | Every Sunlit turn: +2, or +3 if next to another Solar building. |
-| Early | Common | **Thermal Mirror** | Light · Structure | Sunlit | 17.3 | 17.2 | 0.48 | While Sunlit, adjacent hexes also count as Sunlit. Every Sunlit turn: +2 per adjacent Solar building (max 3). |
-| Early | Common | **Radiator Fin** | Cold · Power | Reactive | 16.3 | 15.6 | 0.43 | Reactive: When a hex within range 2 becomes Hot, cool it and score +3 (triggers On Cooling). |
-| Early | Common | **Photon Kiln** | Heat · Industry | Reactive | 16.6 | 17.0 | 0.29 | Reactive: When this hex becomes Sunlit, heat an adjacent empty hex and score +2 per adjacent Mineral deposit (min +4, max +8). |
-| Early | Uncommon | **Sunclock Relay** | Signal · Solar | Reactive | 25.1 | 25.2 | 0.53 | Reactive: When this hex changes between Sunlit and Shadow, +4 and repeat an adjacent Solar building. |
-| Mid | Common | **Solar Furnace** | Heat · Power | Sunlit | 20.1 | 20.9 | 0.39 | Every Sunlit turn: Melt an Ice within range 2 into Water, +7. Without Ice, heat an adjacent empty hex, +3. |
-| Mid | Uncommon | **Capacitor Bloom** | Power · Storage | Sunlit | 27.0 | 25.5 | 0.80 | Every Sunlit turn: store a Charge (max 3), +3. Reactive: When this hex enters Shadow, spend a Charge to repeat an adjacent building, +5. |
-| Mid | Common | **Helium Skimmer** | Fuel · Solar | Sunlit | 21.7 | 21.2 | 0.69 | Every Sunlit turn: Turn a Gas within range 2 into Fuel, +5; otherwise +3. |
-| Mid | Uncommon | **Prism Farm** | Crystal · Light | Sunlit | 25.9 | 24.7 | 0.60 | Every Sunlit turn: +3 per Crystal within range 2 (max 4). |
-| Mid | Uncommon | **Dawn Siren** | Signal · Light | Reactive | 30.4 | 32.1 | 0.89 | Reactive: When a Power building in its network enters Sunlight, repeat a different Power building in the network. +4. |
-| Advanced | Uncommon | **Heat Pipeline** | Link · Heat | Every turn | 32.2 | 30.8 | 1.03 | Link. Every turn: Heat the hex of one connected building that is not Hot (triggers On Heat), then +2 per connected building on a Hot hex (max 3). |
-| Advanced | Common | **Flare Harvester** | Power · Shield | Sunlit | 17.5 | 17.9 | 0.68 | Every Sunlit turn: +4. Protects itself and adjacent buildings from Solar Flares. Reactive: On a Solar Flare, +12. |
-| Advanced | Rare | **Stellar Smelter** | Metal · Heat | Sunlit | 36.3 | 34.1 | 0.61 | Every Sunlit turn: Turn a Metal or Scrap within range 2 into Alloy, +16, and heat this hex. Without one, +8. |
-| Advanced | Rare | **Daystar Engine** | Solar · Motion | Sunlit | 35.9 | 37.0 | 0.81 | Every Sunlit turn: store a Charge (max 3), +5. Ability (once per era): spend 3 Charges to advance the light one phase now; +4 per building that changes light (max +24). |
-| Advanced | Rare | **Corona Crown** | Solar · Power | Reactive | 41.6 | 42.0 | 1.00 | Reactive: Up to twice per turn, when a different Solar building within range 2 activates, repeat it and score +7. |
+| Early | Common | **Sunfoil Canopy** | Solar · Power | Sunlit | 22.5 | 23.4 | 0.77 | Every Sunlit turn: +2, or +3 if next to another Solar building. |
+| Early | Common | **Thermal Mirror** | Light · Structure | Sunlit | 17.3 | 19.3 | 0.58 | While Sunlit, adjacent hexes also count as Sunlit. Every Sunlit turn: +2 per adjacent Solar building (max 3). |
+| Early | Common | **Radiator Fin** | Cold · Power | Shadow | 24.5 | 18.7 | 0.53 | Reactive: When a hex within range 2 becomes Hot, cool it, bank the heat (max 3) and score +3 (triggers On Cooling). Each Shadow turn: radiate the bank, +2 per heat stored. |
+| Early | Common | **Photon Kiln** | Heat · Industry | Reactive | 16.6 | 15.9 | 0.29 | Reactive: When this hex becomes Sunlit, heat an adjacent empty hex and score +2 per adjacent Mineral deposit (min +4, max +8). |
+| Early | Uncommon | **Sunclock Relay** | Signal · Solar | Reactive | 25.1 | 25.3 | 0.53 | Reactive: When this hex changes between Sunlit and Shadow, +4 and repeat an adjacent Solar building. |
+| Mid | Common | **Solar Furnace** | Heat · Power | Sunlit | 20.1 | 18.7 | 0.36 | Every Sunlit turn: Melt an Ice within range 2 into Water, +7. Without Ice, heat an adjacent empty hex, +3. |
+| Mid | Uncommon | **Capacitor Bloom** | Power · Storage | Sunlit | 27.0 | 24.7 | 0.77 | Every Sunlit turn: store a Charge (max 3), +3. Reactive: When this hex enters Shadow, spend a Charge to repeat an adjacent building, +5. |
+| Mid | Common | **Helium Skimmer** | Fuel · Solar | Sunlit | 21.7 | 20.1 | 0.66 | Every Sunlit turn: Turn a Gas within range 2 into Fuel, +5; otherwise +3. |
+| Mid | Uncommon | **Prism Farm** | Crystal · Light | Sunlit | 25.9 | 26.4 | 0.59 | Every Sunlit turn: +3 per Crystal within range 2 (max 4). |
+| Mid | Uncommon | **Dawn Siren** | Signal · Light | Reactive | 30.4 | 33.0 | 0.92 | Reactive: When a Power building in its network enters Sunlight, repeat a different Power building in the network. +4. |
+| Advanced | Uncommon | **Heat Pipeline** | Link · Heat | Every turn | 32.2 | 31.8 | 1.05 | Link. Every turn: Heat the hex of one connected building that is not Hot (triggers On Heat), then +2 per connected building on a Hot hex (max 3). |
+| Advanced | Common | **Flare Harvester** | Power · Shield | Sunlit | 17.5 | 18.9 | 0.70 | Every Sunlit turn: +4. Protects itself and adjacent buildings from Solar Flares. Reactive: On a Solar Flare, +12. |
+| Advanced | Rare | **Stellar Smelter** | Metal · Heat | Sunlit | 36.3 | 40.4 | 0.64 | Every Sunlit turn: Turn a Metal or Scrap within range 2 into Alloy, +16, and heat this hex. Without one, +8. |
+| Advanced | Rare | **Daystar Engine** | Solar · Motion | Sunlit | 35.9 | 34.3 | 0.77 | Every Sunlit turn: store a Charge (max 3), +5. Ability (once per era): spend 3 Charges to advance the light one phase now; +4 per building that changes light (max +24). |
+| Advanced | Rare | **Corona Crown** | Solar · Power | Reactive | 41.6 | 22.8 | 0.54 | Reactive: Up to twice per turn, when a different Solar building within range 2 activates, repeat it and score +7. |
 
 ### ❄️ Cryostead Enclave — Frostkeepers
 
-Ice and Water cycles, Shadow and Cold. Consume Ice now or keep it as a recurring source.
+Ice and Water cycles, Shadow and Cold. Consume Ice now or keep it as a recurring source. Ice bridges: Cryostead buildings connect to any building touching the same Ice or Water.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Ice Harvester** | Ice · Extraction | Every 2 | 18.7 | 17.6 | 0.24 | Every 2 turns: Melt one unit of an Ice within range 2 into Water. +6. |
-| Early | Common | **Shade Screen** | Cold · Structure | Every 2 | 18.0 | 19.0 | 0.56 | On Build: This hex and adjacent hexes become permanently Shadowed, +2. Every 2 turns: +1 per adjacent Cold building or Ice (max 4). Adjacent Cold buildings score +1 when they activate. |
-| Early | Common | **Frost Trap** | Cold · Volatile | Reactive | 21.6 | 20.2 | 0.42 | Reactive: When Water appears on a Shadow hex within range 2, freeze it back into Ice. +4. |
-| Early | Uncommon | **Vapor Collector** | Water · Pressure | Every 2 | 26.6 | 25.0 | 0.55 | Reactive: When Ice melts within range 2, create an extra Water nearby, +3. Every 2 turns: condense a Water onto an adjacent empty hex and score +2 per Water or Ice within range 2 (max 2). |
-| Early | Common | **Brine Tank** | Water · Storage | Every 2 | 16.2 | 15.2 | 0.45 | Every 2 turns: Release a Water onto an adjacent empty hex, +4. Reactive: When Water within range 2 is consumed, +2. |
-| Mid | Common | **Thermal Valve** | Cold · Heat | Reactive | 20.3 | 20.9 | 0.33 | Reactive: When a hex within range 2 becomes Hot, cool it. +5, +3 more if Ice is within range 2. |
-| Mid | Uncommon | **Cryo Vault** | Storage · Cold | Every turn | 33.8 | 33.5 | 1.03 | Every turn: +1 per adjacent resource token (max 4). |
-| Mid | Common | **Sublimator** | Ice · Gas | Every 2 | 20.9 | 19.5 | 0.23 | Every 2 turns: Turn an Ice within range 2 into Gas, +9 (+4 more if that hex or this one is Hot). |
-| Mid | Uncommon | **Frost Lens** | Crystal · Cold | Reactive | 28.1 | 28.9 | 0.64 | Reactive: Each time a Crystal or Ice within range 2 enters Shadow, +5 (up to 4 times per turn). |
-| Mid | Common | **Pressure Still** | Water · Pressure | Every 2 | 18.4 | 19.5 | 0.31 | Every 2 turns: Consume a Water within range 2 to Pressurize this and adjacent hexes for 3 turns. +7. |
-| Advanced | Rare | **Comet Hook** | Orbital · Ice | Every 2 | 37.8 | 35.8 | 0.48 | Every 2 turns: Pull an Ice chunk (2 units) onto an adjacent empty hex (+6), then +5 per Ice within range 2 (max 3). Reactive: On any meteor impact, create Ice near it, +6. |
-| Advanced | Uncommon | **Glacier Loom** | Ice · Structure | Every turn | 24.7 | 25.3 | 0.70 | Every turn in Shadow: Turn an adjacent Dust/Regolith into Ice (+9); if none, create an Ice on an adjacent empty hex (+7). In Sunlight: +5. |
-| Advanced | Rare | **Absolute Engine** | Cold · Power | Shadow | 43.6 | 46.1 | 0.84 | Every Shadow turn: If its network has 3+ Cold buildings (including itself), +12 and repeat a Cold building within range 2. Otherwise +4. |
-| Advanced | Uncommon | **Permafrost Cathedral** | Cold · Shield | Every turn | 31.5 | 30.7 | 0.97 | Every turn: +2 per Cold-tagged token or building within range 2 (max 3). Shields buildings within range 2 from impacts and tremors. |
-| Advanced | Rare | **Cryo-Tide Reactor** | Ice · Power | Every 2 | 36.8 | 38.7 | 0.79 | Reactive: Whenever Ice becomes Water or Water becomes Ice within range 2, +9. Once per turn, repeat the building that caused it. Every 2 turns: +3 per Ice or Water within range 2 (max 3). |
+| Early | Common | **Ice Harvester** | Ice · Extraction | Every 2 | 22.0 | 27.1 | 0.45 | Every 2 turns: Melt one unit of an Ice within range 2 into Water. +6. With no Ice in range, on a Shadow turn it refreezes a Water within range 2 into Ice instead, +2. |
+| Early | Common | **Shade Screen** | Cold · Structure | Every 2 | 18.0 | 16.4 | 0.51 | On Build: This hex and adjacent hexes become permanently Shadowed, +2. Every 2 turns: +1 per adjacent Cold building or Ice (max 4). Adjacent Cold buildings score +1 when they activate. |
+| Early | Common | **Frost Trap** | Cold · Volatile | Reactive | 21.6 | 21.4 | 0.45 | Reactive: When Water appears on a Shadow hex within range 2, freeze it back into Ice. +4. |
+| Early | Uncommon | **Vapor Collector** | Water · Pressure | Every 2 | 26.6 | 25.2 | 0.56 | Reactive: When Ice melts within range 2, create an extra Water nearby, +3. Every 2 turns: condense a Water onto an adjacent empty hex and score +2 per Water or Ice within range 2 (max 2). |
+| Early | Common | **Brine Tank** | Water · Storage | Every 2 | 16.2 | 17.7 | 0.57 | Every 2 turns: Release a Water onto an adjacent empty hex, +4. Reactive: When Water within range 2 is consumed, +2. |
+| Mid | Common | **Thermal Valve** | Cold · Heat | Reactive | 20.3 | 14.6 | 0.24 | Reactive: When a hex within range 2 becomes Hot, cool it. +5, +3 more if Ice is within range 2. |
+| Mid | Uncommon | **Cryo Vault** | Storage · Cold | Every turn | 33.8 | 31.6 | 1.01 | Every turn: +1 per adjacent resource token (max 4). |
+| Mid | Common | **Sublimator** | Ice · Gas | Every 2 | 20.9 | 21.1 | 0.25 | Every 2 turns: Turn an Ice within range 2 into Gas, +9 (+4 more if that hex or this one is Hot). |
+| Mid | Uncommon | **Frost Lens** | Crystal · Cold | Reactive | 28.1 | 26.6 | 0.59 | Reactive: Each time a Crystal or Ice within range 2 enters Shadow, +5 (up to 4 times per turn). |
+| Mid | Common | **Pressure Still** | Water · Pressure | Every 2 | 18.4 | 18.8 | 0.30 | Every 2 turns: Consume a Water within range 2 to Pressurize this and adjacent hexes for 3 turns. +7. |
+| Advanced | Rare | **Comet Hook** | Orbital · Ice | Every 2 | 37.8 | 34.4 | 0.49 | Every 2 turns: Pull an Ice chunk (2 units) onto an adjacent empty hex (+6), then +5 per Ice within range 2 (max 3). Reactive: On any meteor impact, create Ice near it, +6. |
+| Advanced | Uncommon | **Glacier Loom** | Ice · Structure | Every turn | 24.7 | 25.3 | 0.71 | Every turn in Shadow: Turn an adjacent Dust/Regolith into Ice (+9); if none, create an Ice on an adjacent empty hex (+7). In Sunlight: +5. |
+| Advanced | Rare | **Absolute Engine** | Cold · Power | Shadow | 43.6 | 41.7 | 0.85 | Every Shadow turn: If its network has 3+ Cold buildings (including itself), +12 and repeat a Cold building within range 2. Otherwise +4. |
+| Advanced | Uncommon | **Permafrost Cathedral** | Cold · Shield | Every turn | 31.5 | 28.1 | 1.00 | Every turn: +2 per Cold-tagged token or building within range 2 (max 3). Shields buildings within range 2 from impacts and tremors. |
+| Advanced | Rare | **Cryo-Tide Reactor** | Ice · Power | Every 2 | 36.8 | 60.0 | 1.18 | Reactive: Whenever Ice becomes Water or Water becomes Ice within range 2, +9. Once per turn, repeat the building that caused it. Every 2 turns: +3 per Ice or Water within range 2 (max 3). |
 
 ### 🌱 Verdant Exodus — Terraformers
 
@@ -166,21 +166,21 @@ Bio-Loam, Biomass, Pressure and growth chains.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Spore Seeder** | Bio · Growth | Every 2 | 17.5 | 16.5 | 0.25 | On Build: Turn up to 2 adjacent Organic Seam/Bio-Loam units into Biomass, +3 each. Every 2 turns: convert one within range 2 (+6); if none, seed an Organic Seam on an adjacent empty hex (+3). |
-| Early | Common | **Algae Tank** | Bio · Water | Every 2 | 23.3 | 24.1 | 0.49 | Every 2 turns: Turn a Water within range 2 into Biomass, +6. Without Water, +2 per Bio token within range 2 (max 2). |
-| Early | Common | **Carbon Net** | Bio · Gas | Every 3 | 16.1 | 16.7 | 0.49 | Reactive: When Gas or Biomass appears within range 2, +2 (+2 more if Water is within range 2). Every 3 turns: +1 per Bio token within range 2 (max 3). |
-| Early | Uncommon | **Root Tunnel** | Bio · Link | Every 2 | 31.6 | 29.9 | 0.48 | Link. Bio buildings in its network score +1 whenever they activate. Every 2 turns: +1 per Bio building in its network (max 2). |
-| Early | Common | **Oxygen Orchard** | Bio · Pressure | Every 2 | 24.0 | 25.0 | 0.61 | Reactive: When Biomass appears within range 2, Pressurize this and adjacent hexes for 3 turns, +6. Every 2 turns: +1 per adjacent Bio building, +2 more if its own hex is Pressurized. |
-| Mid | Common | **Myco Bloom** | Growth · Bio | Every 2 | 19.7 | 20.8 | 0.29 | Every 2 turns: Turn an Organic Seam, Bio-Loam or Dust within range 2 into Biomass, +9; if none, seed an Organic Seam beside this, +3. Reactive: When an adjacent building is destroyed, grow Biomass on its hex, +5. |
-| Mid | Uncommon | **Symbiotic Cradle** | Bio · Habitat | Every 2 | 26.0 | 26.9 | 0.48 | Every 2 turns: +4 per adjacent building on a Pressurized hex (max 3), +3 if its own hex is Pressurized, +1 per adjacent Bio building. |
-| Mid | Common | **Lichen Harvester** | Bio · Dust | Every 2 | 16.2 | 15.9 | 0.33 | Every 2 turns: Turn a Regolith/Dust within range 2 into Organic Seam, +8. Otherwise +2 per adjacent Bio building (max 3). |
-| Mid | Uncommon | **Radiotrophic Garden** | Bio · Radiation | Every 2 | 31.9 | 33.7 | 0.58 | Reactive: When Radiation appears within range 2, +7 and turn an Organic Seam within range 2 into Biomass. Every 2 turns: +3 per Radiated hex within range 2 (max 4). |
-| Mid | Common | **Nectar Reactor** | Bio · Fuel | Every 2 | 17.8 | 18.2 | 0.23 | Every 2 turns: Turn a Biomass within range 2 into Fuel. +9. |
-| Advanced | Uncommon | **Tendril Bridge** | Bio · Link | Every turn | 31.7 | 29.6 | 1.03 | Link (reach 3): connects buildings up to 3 hexes away. Every turn: +1 per connected building (max 2) and +1 more per connected Bio building (max 3). |
-| Advanced | Rare | **Bloomstorm Laboratory** | Bio · Growth | Every 2 | 36.6 | 39.0 | 0.60 | Reactive: Each Biomass appearing within range 2 scores +3; every third one also grows 2 extra Biomass nearby, +8. Every 2 turns: +4 per Biomass within range 2 (max 4). |
-| Advanced | Uncommon | **Worldroot** | Bio · Anchor | Every 2 | 26.0 | 24.8 | 0.66 | On Build: Stabilize adjacent hexes (+2 per Cavern or Unstable hex). Reactive: When Biomass appears within range 2, make that hex Stable, +5. Every 2 turns: +4 per adjacent Bio building or Biomass (max 3). |
-| Advanced | Rare | **Living Shipyard** | Bio · Orbital | Every 2 | 41.1 | 40.2 | 0.42 | Every 2 turns: Launch a Biomass within range 2 of this, or adjacent to a connected building, into orbit as Bio Cargo (triggers Arrival). +16. |
-| Advanced | Rare | **Genesis Choir** | Bio · Growth | Every 2 | 35.8 | 36.6 | 0.58 | Reactive (up to twice per turn): When Biomass appears within range 2, +3 per Bio building within range 2 (max +12). The first time each turn, also repeat an adjacent Bio building. Every 2 turns: +3 per Bio building or Biomass within range 2 (max 4). |
+| Early | Common | **Spore Seeder** | Bio · Growth | Every 2 | 18.3 | 20.9 | 0.34 | On Build: Turn up to 2 adjacent Organic Seam/Bio-Loam units into Biomass, +3 each. Every 2 turns: convert one within range 2 (+6); if none, the spores drift and seed an Organic Seam on an empty hex within range 2 (+3). |
+| Early | Common | **Algae Tank** | Bio · Water | Every 2 | 23.3 | 24.5 | 0.48 | Every 2 turns: Turn a Water within range 2 into Biomass, +6. Without Water, +2 per Bio token within range 2 (max 2). |
+| Early | Common | **Carbon Net** | Bio · Gas | Every 3 | 16.1 | 17.1 | 0.51 | Reactive: When Gas or Biomass appears within range 2, +2 (+2 more if Water is within range 2). Every 3 turns: +1 per Bio token within range 2 (max 3). |
+| Early | Uncommon | **Root Tunnel** | Bio · Link | Every 2 | 31.6 | 34.1 | 0.49 | Link. Bio buildings in its network score +1 whenever they activate. Every 2 turns: +1 per Bio building in its network (max 2). |
+| Early | Common | **Oxygen Orchard** | Bio · Pressure | Every 2 | 24.0 | 24.7 | 0.60 | Reactive: When Biomass appears within range 2, Pressurize this and adjacent hexes for 3 turns, +6. Every 2 turns: +1 per adjacent Bio building, +2 more if its own hex is Pressurized. |
+| Mid | Common | **Myco Bloom** | Growth · Bio | Every 2 | 19.7 | 20.6 | 0.28 | Every 2 turns: Turn an Organic Seam, Bio-Loam or Dust within range 2 into Biomass, +9; if none, seed an Organic Seam beside this, +3. Reactive: When an adjacent building is destroyed, grow Biomass on its hex, +5. |
+| Mid | Uncommon | **Symbiotic Cradle** | Bio · Habitat | Every 2 | 26.0 | 28.1 | 0.43 | Every 2 turns: +4 per adjacent building on a Pressurized hex (max 3), +3 if its own hex is Pressurized, +1 per adjacent Bio building. |
+| Mid | Common | **Lichen Harvester** | Bio · Dust | Every 2 | 16.2 | 15.4 | 0.34 | Every 2 turns: Turn a Regolith/Dust within range 2 into Organic Seam, +8. Otherwise +2 per adjacent Bio building (max 3). |
+| Mid | Uncommon | **Radiotrophic Garden** | Bio · Radiation | Every 2 | 31.9 | 32.3 | 0.51 | Reactive: When Radiation appears within range 2, +7 and turn an Organic Seam within range 2 into Biomass. Every 2 turns: +3 per Radiated hex within range 2 (max 4). |
+| Mid | Common | **Nectar Reactor** | Bio · Fuel | Every 2 | 17.8 | 19.7 | 0.24 | Every 2 turns: Turn a Biomass within range 2 into Fuel. +9. |
+| Advanced | Uncommon | **Tendril Bridge** | Bio · Link | Every turn | 31.7 | 30.4 | 1.03 | Link (reach 3): connects buildings up to 3 hexes away. Every turn: +1 per connected building (max 2) and +1 more per connected Bio building (max 3). |
+| Advanced | Rare | **Bloomstorm Laboratory** | Bio · Growth | Every 2 | 36.6 | 29.2 | 0.57 | Reactive: Each Biomass appearing within range 2 scores +3; every third one also grows 2 extra Biomass nearby, +8. Every 2 turns: +4 per Biomass within range 2 (max 4). |
+| Advanced | Uncommon | **Worldroot** | Bio · Anchor | Every 2 | 27.9 | 26.2 | 0.66 | On Build: Stabilize adjacent hexes (+2 per Cavern or Unstable hex). Reactive: When Biomass appears within range 2, make that hex Stable, +5. Every 2 turns: the roots creep – with fewer than 3 adjacent Bio buildings or Biomass, plant Biomass beside it; then +4 per adjacent Bio building or Biomass (max 3). |
+| Advanced | Rare | **Living Shipyard** | Bio · Orbital | Every 2 | 41.1 | 41.8 | 0.44 | Every 2 turns: Launch a Biomass within range 2 of this, or adjacent to a connected building, into orbit as Bio Cargo (triggers Arrival). +16. |
+| Advanced | Rare | **Genesis Choir** | Bio · Growth | Every 2 | 35.8 | 34.2 | 0.61 | Reactive (up to twice per turn): When Biomass appears within range 2, +3 per Bio building within range 2 (max +12). The first time each turn, also repeat an adjacent Bio building. Every 2 turns: +3 per Bio building or Biomass within range 2 (max 4). |
 
 ### 🧠 Synapse Circuit — Machine Minds
 
@@ -188,21 +188,21 @@ Signals, networks and repeat activations that make other buildings stronger.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Relay Pylon** | Signal · Link | Every 2 | 23.7 | 22.5 | 0.98 | Link. Reactive: When a Signal or Link building is placed within range 2, +2. Every 2 turns: +1 per Signal building in its network (max 2). |
-| Early | Common | **Survey Drone Port** | Drone · Signal | Every 2 | 24.4 | 25.4 | 0.85 | On Build and every 2 turns: Reveal a buried deposit within range 3 (+5); if none remain, +2. |
-| Early | Uncommon | **Trigger Coil** | Automation · Power | Reactive | 33.1 | 33.7 | 0.70 | Reactive: Once per turn, when an adjacent building activates from its timer, repeat it. +4. |
-| Early | Common | **Cargo Bot** | Drone · Cargo | Every 2 | 15.0 | 15.8 | 0.22 | Every 2 turns: Pack a loose resource within range 2 into Cargo. +6. |
-| Early | Common | **Array Beacon** | Signal · Power | Every 2 | 21.4 | 21.5 | 0.60 | Every 2 turns: Repeat a different Signal building within range 2, +3. If none, +3 anyway. |
-| Mid | Uncommon | **Sensor Weave** | Signal · Crystal | Every 2 | 31.5 | 35.4 | 0.92 | Every 2 turns: +2 per Crystal within range 2 (max 3). With 3 Crystals, also repeat a Signal building within range 2. |
-| Mid | Uncommon | **Data Scriptorium** | Data · Signal | Every turn | 31.5 | 32.5 | 1.28 | End of each turn: +1 per distinct tag among buildings in its network that activated this turn (max 3). |
-| Mid | Common | **Replicator Bay** | Drone · Metal | Reactive | 19.3 | 18.3 | 0.34 | Reactive: When a Metal-tagged resource is consumed within range 2, +6 (up to 3 times per turn). |
-| Mid | Common | **Path Optimizer** | Automation · Link | Every 2 | 18.2 | 18.8 | 1.06 | Link. Reactive: When a building joins its network, +1. Every 2 turns: +1 per Automation, Drone or Signal building in its network (max 3). |
-| Mid | Rare | **Echo Switch** | Signal · Automation | Every turn | 42.8 | 45.3 | 1.26 | Every turn: Repeat the most recently activated building within range 2. +4. |
-| Advanced | Uncommon | **Swarm Dock** | Drone · Storage | Every 2 | 32.8 | 34.1 | 0.63 | Every 2 turns: Repeat up to 2 different Automation, Drone or Power buildings within range 2. +9. |
-| Advanced | Rare | **Quantum Repeater** | Signal · Exotic | Every 3 | 39.4 | 41.3 | 1.19 | Reactive: Once per turn, when a building within range 2 is repeated, repeat a different building within range 2, +8. Every 3 turns: repeat a building within range 2, +4. |
-| Advanced | Common | **Ghost Protocol** | Signal · Salvage | Every 2 | 18.9 | 18.2 | 0.79 | Reactive: When a building within range 2 is destroyed, +5 and leave Scrap on its hex. Every 2 turns: +2 per Signal building in its network (max 2). |
-| Advanced | Rare | **Network Brain** | Automation · Data | Every turn | 37.1 | 35.3 | 1.05 | End of each turn: +1 per distinct tag among network buildings that activated this turn (max +7). |
-| Advanced | Uncommon | **Cascade Singularity** | Automation · Signal | Reactive | 31.9 | 33.1 | 0.79 | Reactive: Once per turn, when a building in its network is repeated, repeat a different network building. +7. |
+| Early | Common | **Relay Pylon** | Signal · Link | Every 2 | 23.7 | 24.0 | 1.04 | Link. Reactive: When a Signal or Link building is placed within range 2, +2. Every 2 turns: +1 per Signal building in its network (max 2). |
+| Early | Common | **Survey Drone Port** | Drone · Signal | Every 2 | 24.4 | 27.4 | 0.92 | On Build and every 2 turns: Reveal a buried deposit within range 3 (+5); if none remain, +2. |
+| Early | Uncommon | **Trigger Coil** | Automation · Power | Reactive | 33.1 | 35.9 | 0.75 | Reactive: Once per turn, when an adjacent building activates from its timer, repeat it. +4. |
+| Early | Common | **Cargo Bot** | Drone · Cargo | Every 2 | 15.0 | 17.7 | 0.25 | Every 2 turns: Pack a loose resource within range 2 into Cargo. +6. |
+| Early | Common | **Array Beacon** | Signal · Power | Every 2 | 21.4 | 21.9 | 0.61 | Every 2 turns: Repeat a different Signal building within range 2, +3. If none, +3 anyway. |
+| Mid | Uncommon | **Sensor Weave** | Signal · Crystal | Every 2 | 31.5 | 35.4 | 0.96 | Every 2 turns: +2 per Crystal within range 2 (max 3). With 3 Crystals, also repeat a Signal building within range 2. |
+| Mid | Uncommon | **Data Scriptorium** | Data · Signal | Every turn | 31.5 | 32.6 | 1.25 | End of each turn: +1 per distinct tag among buildings in its network that activated this turn (max 3). |
+| Mid | Common | **Replicator Bay** | Drone · Metal | Reactive | 19.3 | 20.4 | 0.38 | Reactive: When a Metal-tagged resource is consumed within range 2, +6 (up to 3 times per turn). |
+| Mid | Common | **Path Optimizer** | Automation · Link | Every 2 | 18.2 | 19.1 | 1.10 | Link. Reactive: When a building joins its network, +1. Every 2 turns: +1 per Automation, Drone or Signal building in its network (max 3). |
+| Mid | Rare | **Echo Switch** | Signal · Automation | Every turn | 42.8 | 41.5 | 1.15 | Every turn: Repeat the most recently activated building within range 2. +4. |
+| Advanced | Uncommon | **Swarm Dock** | Drone · Storage | Every 2 | 32.8 | 31.4 | 0.58 | Every 2 turns: Repeat up to 2 different Automation, Drone or Power buildings within range 2. +9. |
+| Advanced | Rare | **Quantum Repeater** | Signal · Exotic | Every 3 | 39.4 | 44.6 | 1.15 | Reactive: Once per turn, when a building within range 2 is repeated, repeat a different building within range 2, +8. Every 3 turns: repeat a building within range 2, +4. |
+| Advanced | Common | **Ghost Protocol** | Signal · Salvage | Every 2 | 18.9 | 21.4 | 0.90 | Reactive: When a building within range 2 is destroyed, +5 and leave Scrap on its hex. Every 2 turns: +2 per Signal building in its network (max 2). |
+| Advanced | Rare | **Network Brain** | Automation · Data | Every turn | 37.1 | 40.3 | 1.02 | End of each turn: +1 per distinct tag among network buildings that activated this turn (max +7). |
+| Advanced | Uncommon | **Cascade Singularity** | Automation · Signal | Reactive | 31.9 | 27.9 | 0.66 | Reactive: Once per turn, when a building in its network is repeated, repeat a different network building. +7. |
 
 ### ♻️ Wreckborn Fleet — Reclaimers
 
@@ -210,21 +210,21 @@ Scrap, salvage and demolition. Sometimes tearing down pays more than keeping.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Scrap Picker** | Salvage · Scrap | Reactive | 19.4 | 18.7 | 0.45 | On Build: Drop 2 Scrap on adjacent empty hexes. Reactive: When Scrap or Wreckage within range 2 is consumed, +4. |
-| Early | Common | **Derelict Tug** | Salvage · Cargo | Every 2 | 21.3 | 21.6 | 0.56 | On Build: Tow up to 2 Wreckage within range 3 next to this, +3 each. Every 2 turns: haul in a new Wreckage beside this (+5); if there is no room, +2. |
-| Early | Common | **Fuse Charger** | Explosive · Heat | Every 2 | 22.9 | 21.5 | 0.30 | Every 2 turns: Consume a Scrap within range 2 and heat its hex. +6. |
-| Early | Common | **Patchwork Hull** | Structure · Scrap | Every 2 | 22.2 | 21.4 | 0.50 | Every 2 turns: Shed a Scrap onto an adjacent empty hex, +2, and +1 per Scrap within range 2 (max 2). Reactive: When an adjacent building is destroyed, become Shielded, +4. |
-| Early | Common | **Breaker Yard** | Salvage · Metal | Every 2 | 16.6 | 16.4 | 0.17 | Every 2 turns: Break one unit of a Wreckage within range 2 into Scrap. +8. |
-| Mid | Common | **Debris Mill** | Salvage · Dust | Every 2 | 18.5 | 18.4 | 0.46 | Every 2 turns: Turn a Dust/Regolith within range 2 into Scrap, +8; otherwise +1 per Scrap within range 2 (max 3). Reactive: When a building within range 2 is destroyed, drop Scrap nearby, +3. |
-| Mid | Uncommon | **Black Box Booth** | Data · Salvage | Reactive | 29.1 | 28.1 | 0.39 | Reactive: When Scrap or Wreckage within range 2 is consumed, or a building within range 2 is destroyed, +8; the first time each turn, also draw an extra card next turn. |
-| Mid | Uncommon | **Ramjet Scow** | Fuel · Motion | Every 2 | 25.7 | 24.4 | 0.21 | Every 2 turns: Burn a Fuel within range 2 to repeat an adjacent building. +13. |
-| Mid | Uncommon | **Blast Fence** | Shield · Structure | Every 2 | 24.9 | 23.6 | 0.47 | Every 2 turns: +2 per adjacent building (max 4). Guard: A meteor within range 2 hits the Fence instead – it is destroyed, leaves 2 Scrap, and scores +6. |
-| Mid | Uncommon | **Reclaimer Loop** | Scrap · Automation | Every 3 | 25.4 | 25.1 | 0.52 | Reactive: Once per turn, when Scrap is consumed within range 2, create a fresh Scrap beside this, +6. Every 3 turns: +2 per Scrap within range 2 (max 3). |
-| Advanced | Common | **Jettison Bay** | Cargo · Orbital | Every 2 | 24.8 | 25.8 | 0.39 | Every 2 turns: Launch a loose resource within range 2 into orbit (triggers Launch and Arrival). +11. |
-| Advanced | Rare | **Scavenger Market** | Trade · Scrap | Every turn | 37.0 | 35.5 | 1.03 | End of each turn: +6 per resource consumed within range 3 this turn (max 6), min +5. |
-| Advanced | Rare | **Shipgrave Forge** | Scrap · Metal | Every 2 | 38.4 | 40.2 | 0.31 | Every 2 turns: Fuse 2 Scrap or Wreckage units within range 2 into one Alloy, +28. With only one, turn it into Alloy for +16. |
-| Advanced | Uncommon | **Catastrophe Engine** | Explosive · Salvage | Every 2 | 30.4 | 30.5 | 0.66 | Every 2 turns: +2 per Wreckage or Scrap within range 2 (max 3). Ability (once per era): Demolish a friendly building within range 2: +5 per building adjacent to it; leaves Wreckage (triggers On Destroy). |
-| Advanced | Rare | **Phoenix Ark** | Salvage · Habitat | Every 2 | 39.0 | 36.8 | 0.56 | Reactive: Once per turn, when a friendly building within range 2 is destroyed, return its card to your hand, +10. Every 2 turns: +5 per adjacent building (max 3). |
+| Early | Common | **Scrap Picker** | Salvage · Scrap | Reactive | 19.4 | 20.2 | 0.48 | On Build: Drop 2 Scrap on adjacent empty hexes. Reactive: When Scrap or Wreckage within range 2 is consumed, +4. |
+| Early | Common | **Derelict Tug** | Salvage · Cargo | Every 2 | 21.3 | 21.7 | 0.56 | On Build: Tow up to 2 Wreckage within range 3 next to this, +3 each. Every 2 turns: haul in a new Wreckage beside this (+5); if there is no room, +2. |
+| Early | Common | **Fuse Charger** | Explosive · Heat | Every 2 | 22.9 | 22.8 | 0.32 | Every 2 turns: Consume a Scrap within range 2 and heat its hex. +6. |
+| Early | Common | **Patchwork Hull** | Structure · Scrap | Every 2 | 22.2 | 21.4 | 0.51 | Every 2 turns: Shed a Scrap onto an adjacent empty hex, +2, and +1 per Scrap within range 2 (max 2). Reactive: When an adjacent building is destroyed, become Shielded, +4. |
+| Early | Common | **Breaker Yard** | Salvage · Metal | Every 2 | 25.2 | 25.6 | 0.52 | Every 2 turns: Break one unit of a Wreckage within range 2 into Scrap. +8. If there is none, pick through the yard instead, +2. |
+| Mid | Common | **Debris Mill** | Salvage · Dust | Every 2 | 18.5 | 17.9 | 0.45 | Every 2 turns: Turn a Dust/Regolith within range 2 into Scrap, +8; otherwise +1 per Scrap within range 2 (max 3). Reactive: When a building within range 2 is destroyed, drop Scrap nearby, +3. |
+| Mid | Uncommon | **Black Box Booth** | Data · Salvage | Reactive | 29.1 | 29.3 | 0.41 | Reactive: When Scrap or Wreckage within range 2 is consumed, or a building within range 2 is destroyed, +8; the first time each turn, also draw an extra card next turn. |
+| Mid | Uncommon | **Ramjet Scow** | Fuel · Motion | Every 2 | 25.7 | 28.0 | 0.24 | Every 2 turns: Burn a Fuel within range 2 to repeat an adjacent building. +13. |
+| Mid | Uncommon | **Blast Fence** | Shield · Structure | Every 2 | 29.2 | 25.3 | 0.45 | Every 2 turns: +1, plus +2 per adjacent building (max 4). Guard: A meteor within range 2 hits the Fence instead – it is destroyed, leaves 2 Scrap, and scores +6. |
+| Mid | Uncommon | **Reclaimer Loop** | Scrap · Automation | Every 3 | 25.4 | 26.9 | 0.57 | Reactive: Once per turn, when Scrap is consumed within range 2, create a fresh Scrap beside this, +6. Every 3 turns: +2 per Scrap within range 2 (max 3). |
+| Advanced | Common | **Jettison Bay** | Cargo · Orbital | Every 2 | 24.8 | 26.1 | 0.40 | Every 2 turns: Launch a loose resource within range 2 into orbit (triggers Launch and Arrival). +11. |
+| Advanced | Rare | **Scavenger Market** | Trade · Scrap | Every turn | 37.0 | 41.9 | 1.03 | End of each turn: +6 per resource consumed within range 3 this turn (max 6), min +5. |
+| Advanced | Rare | **Shipgrave Forge** | Scrap · Metal | Every 2 | 38.4 | 40.0 | 0.29 | Every 2 turns: Fuse 2 Scrap or Wreckage units within range 2 into one Alloy, +28. With only one, turn it into Alloy for +16. |
+| Advanced | Uncommon | **Catastrophe Engine** | Explosive · Salvage | Every 2 | 30.4 | 26.7 | 0.61 | Every 2 turns: +2 per Wreckage or Scrap within range 2 (max 3). Ability (once per era): Demolish a friendly building within range 2: +5 per building adjacent to it; leaves Wreckage (triggers On Destroy). |
+| Advanced | Rare | **Phoenix Ark** | Salvage · Habitat | Every 2 | 42.1 | 48.9 | 0.49 | Reactive: Once per turn, when a friendly building within range 2 is destroyed, return its card to your hand, +10. Every 2 turns: +6 per adjacent building (max 3). |
 
 ### 🛰️ Kepler Cartographers — Orbitwrights
 
@@ -232,21 +232,21 @@ Orbit slots, Cargo launches and arrivals, long-range links.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Tether Node** | Orbit · Link | Every 2 | 20.1 | 19.4 | 0.59 | Link. Connects its network to every building in an Orbital slot. On Build: +2. Every 2 turns: +2 per building in Orbital slots (max 3), min +2. |
-| Early | Common | **Launch Rail** | Orbital · Cargo | Every 2 | 19.0 | 19.2 | 0.35 | Every 2 turns: Launch a Cargo within range 2 (+6). If there is none, pack a loose resource within range 2 into Cargo (+3). |
-| Early | Common | **Microthruster** | Motion · Power | Every 4 | 22.5 | 22.0 | 0.31 | Every 4 turns: Nudge the asteroid – the light advances one extra phase (rotation triggers fire). +6. |
-| Early | Common | **Radar Dish** | Signal · Orbital | Every 3 | 21.5 | 20.8 | 0.58 | Forecasts the next 3 local events. Every 3 turns: +3. Reactive: On any impact, +3. |
-| Early | Uncommon | **Gravity Sling** | Orbit · Cargo | Every 3 | 28.1 | 28.3 | 0.63 | Reactive (orbit-linked): Once per turn, when Cargo arrives in orbit, swing it around for a second Arrival, +5. Every 3 turns: +1 per building in Orbital slots (max 3). |
-| Mid | Common | **Docking Hoop** | Orbital · Trade | Reactive | 15.4 | 14.6 | 0.54 | Reactive (orbit-linked): When Cargo arrives in orbit, +3. |
-| Mid | Uncommon | **Skyhook** | Orbit · Link | Every turn | 33.1 | 31.9 | 1.01 | Link. Connects its network to Orbital slots. Every turn: +1 per building in its network that sits in an Orbital slot or has an Orbit/Orbital tag (max 4). |
-| Mid | Common | **Mass Driver** | Motion · Metal | Every 2 | 20.3 | 21.5 | 0.30 | Every 2 turns: Launch a Metal-tagged token within range 2 into orbit as Metal Cargo. +8. |
-| Mid | Uncommon | **Satellite Orchard** | Orbit · Solar | Every turn | 24.9 | 24.0 | 0.69 | Every turn: +2 per Sunlit Solar or Power building within range 2 or in its network (max 3). |
-| Mid | Common | **Comet Net** | Orbit · Ice | Every 3 | 15.7 | 16.3 | 0.40 | Guard: Catches meteors within range 3 – no damage – and drops their Ice or Ore nearby, +6. Every 3 turns: +4. |
-| Advanced | Uncommon | **Cycler Shuttle** | Orbit · Habitat | Every 2 | 26.0 | 26.6 | 0.46 | Every 2 turns: Launch a Water or Biomass within range 2 of this or a connected building. +12, +5 if a connected Habitat is Pressurized. If there is nothing to launch, +2. |
-| Advanced | Uncommon | **Perigee Loom** | Gravity · Orbit | Every turn | 28.9 | 28.9 | 1.00 | Every turn: +1 per distinct tag among adjacent buildings (max 6). |
-| Advanced | Rare | **Orbital Foundry** | Orbit · Alloy | Reactive | 37.3 | 38.2 | 0.66 | Reactive (orbit-linked): When Metal-tagged Cargo arrives in orbit, land Alloy beside this, +16. Other arrivals: +8. |
-| Advanced | Rare | **Ring Habitat** | Orbit · Habitat | Every turn | 39.4 | 40.0 | 1.00 | Every turn: +4 per Pressurized Habitat within range 2 or in its network (max 3), min +3. Not affected by Radiation in an Orbital slot. |
-| Advanced | Rare | **Shepherd Engine** | Orbit · Motion | Every turn | 36.6 | 38.1 | 1.06 | Every turn: +6. Ability (once per era): Redirect the next meteor to any land hex; when it lands there, +10 and it drops extra deposits. |
+| Early | Common | **Tether Node** | Orbit · Link | Every 2 | 20.1 | 20.2 | 0.59 | Link. Connects its network to every building in an Orbital slot. On Build: +2. Every 2 turns: +2 per building in Orbital slots (max 3), min +2. |
+| Early | Common | **Launch Rail** | Orbital · Cargo | Every 2 | 19.0 | 19.9 | 0.37 | Every 2 turns: Launch a Cargo within range 2 (+6). If there is none, pack a loose resource within range 2 into Cargo (+3). |
+| Early | Common | **Microthruster** | Motion · Power | Every 4 | 24.8 | 27.2 | 0.32 | Every 4 turns: Nudge the asteroid – the light advances one extra phase (rotation triggers fire). +7. |
+| Early | Common | **Radar Dish** | Signal · Orbital | Every 3 | 21.5 | 20.7 | 0.57 | Forecasts the next 3 local events. Every 3 turns: +3. Reactive: On any impact, +3. |
+| Early | Uncommon | **Gravity Sling** | Orbit · Cargo | Every 3 | 28.1 | 28.2 | 0.62 | Reactive (orbit-linked): Once per turn, when Cargo arrives in orbit, swing it around for a second Arrival, +5. Every 3 turns: +1 per building in Orbital slots (max 3). |
+| Mid | Common | **Docking Hoop** | Orbital · Trade | Reactive | 15.4 | 15.4 | 0.57 | Reactive (orbit-linked): When Cargo arrives in orbit, +3. |
+| Mid | Uncommon | **Skyhook** | Orbit · Link | Every turn | 33.1 | 31.6 | 1.02 | Link. Connects its network to Orbital slots. Every turn: +1 per building in its network that sits in an Orbital slot or has an Orbit/Orbital tag (max 4). |
+| Mid | Common | **Mass Driver** | Motion · Metal | Every 2 | 20.3 | 20.1 | 0.28 | Every 2 turns: Launch a Metal-tagged token within range 2 into orbit as Metal Cargo. +8. |
+| Mid | Uncommon | **Satellite Orchard** | Orbit · Solar | Every turn | 24.9 | 28.9 | 0.80 | Every turn: +2 per Sunlit Solar or Power building within range 2 or in its network (max 3). |
+| Mid | Common | **Comet Net** | Orbit · Ice | Every 3 | 15.7 | 15.7 | 0.39 | Guard: Catches meteors within range 3 – no damage – and drops their Ice or Ore nearby, +6. Every 3 turns: +4. |
+| Advanced | Uncommon | **Cycler Shuttle** | Orbit · Habitat | Every 2 | 26.0 | 22.0 | 0.47 | Every 2 turns: Launch a Water or Biomass within range 2 of this or a connected building. +12, +5 if a connected Habitat is Pressurized. If there is nothing to launch, +2. |
+| Advanced | Uncommon | **Perigee Loom** | Gravity · Orbit | Every turn | 28.9 | 28.1 | 1.02 | Every turn: +1 per distinct tag among adjacent buildings (max 6). |
+| Advanced | Rare | **Orbital Foundry** | Orbit · Alloy | Reactive | 37.3 | 30.2 | 0.55 | Reactive (orbit-linked): When Metal-tagged Cargo arrives in orbit, land Alloy beside this, +16. Other arrivals: +8. |
+| Advanced | Rare | **Ring Habitat** | Orbit · Habitat | Every turn | 39.4 | 25.3 | 1.01 | Every turn: +4 per Pressurized Habitat within range 2 or in its network (max 3), min +3. Not affected by Radiation in an Orbital slot. |
+| Advanced | Rare | **Shepherd Engine** | Orbit · Motion | Every turn | 36.6 | 37.3 | 1.04 | Every turn: +6. Ability (once per era): Redirect the next meteor to any land hex; when it lands there, +10 and it drops extra deposits. |
 
 ### 🏠 Hearthline Compact — Colonists
 
@@ -254,21 +254,21 @@ Habitats, Pressure, culture and cross-clan cooperation.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Pressure Dome** | Habitat · Pressure | Every turn | 22.8 | 23.2 | 1.09 | On Build: Pressurize this and adjacent hexes. Every turn: +1 per adjacent building on a Pressurized hex (max 2). |
-| Early | Common | **Airlock Junction** | Habitat · Link | Every 2 | 17.7 | 18.2 | 0.87 | Link. On Build: Pressurize this hex. Reactive: When a Habitat joins its network, +2. Every 2 turns: +1 per Habitat in its network (max 2). |
-| Early | Common | **Pioneer Quarters** | Habitat · Citizen | Every 2 | 20.4 | 21.3 | 0.44 | Every 2 turns: +2 per adjacent building on a Pressurized hex (max 3). |
-| Early | Common | **Community Galley** | Habitat · Bio | Every 3 | 18.5 | 19.5 | 0.44 | Reactive: When Water, Biomass, Fuel or Cargo is consumed within range 2, +4. Every 3 turns: +2 per adjacent Habitat (max 3). |
-| Early | Uncommon | **Beacon Plaza** | Culture · Signal | Every turn | 32.4 | 32.7 | 1.04 | End of each turn: +1 per distinct clan whose buildings activated within range 2 this turn (max 3), +2 more with all three. |
-| Mid | Common | **Life Support Array** | Pressure · Water | Every 2 | 22.8 | 21.4 | 0.61 | On Build: Pressurize this hex. Reactive: When Water within range 2 is consumed, Pressurize adjacent hexes for 3 turns, +5. Every 2 turns: +3 per adjacent Habitat (max 3). |
-| Mid | Uncommon | **Shielded Nursery** | Habitat · Shield | Every 2 | 28.4 | 27.7 | 0.42 | Shields adjacent Habitats from impacts and tremors. Every 2 turns: +4 per adjacent Habitat (max 3). |
-| Mid | Common | **Transit Causeway** | Link · Habitat | Every turn | 22.2 | 23.4 | 1.02 | Link (reach 3). Every turn: +1 per Pressurized Habitat in its network (max 3). |
-| Mid | Uncommon | **Spaceport Canteen** | Trade · Culture | Every 2 | 29.7 | 29.3 | 0.63 | Reactive: Whenever Cargo arrives in orbit anywhere, +6. Every 2 turns: +2 per Cargo or adjacent Habitat (max 3). |
-| Mid | Uncommon | **Education Spire** | Culture · Signal | Every turn | 29.9 | 28.7 | 0.92 | End of each turn: with 3+ distinct tags activated within range 2 this turn, +2 and draw an extra card next turn; with 6+, +5 instead. |
-| Advanced | Common | **Thermal Commons** | Heat · Habitat | Every 2 | 23.0 | 24.0 | 0.66 | On Build: Pressurize this hex. Every 2 turns: +5 per adjacent Habitat (max 3), +4 if an adjacent hex is Hot. Reactive: When a hex within range 2 is cooled, +5 and Pressurize adjacent hexes for 3 turns. |
-| Advanced | Rare | **Embassy Cluster** | Habitat · Culture | Every 2 | 41.8 | 41.3 | 0.49 | Every 2 turns: +5 per distinct active clan among buildings within range 2 (max 3). |
-| Advanced | Rare | **Arcology Stack** | Habitat · Pressure | Every turn | 34.1 | 33.0 | 1.11 | On Build: Pressurize this and adjacent hexes. Every turn: +3 per adjacent Pressurized Habitat (max 2); +3 more if its network spans Surface and Cavern. |
-| Advanced | Uncommon | **Stargazer Memorial** | Culture · Orbit | Every turn | 27.8 | 29.3 | 1.03 | Every turn: +2 per Habitat within range 2 (max 3). Reactive: When a meteor lands within range 3 without destroying anything, +8. |
-| Advanced | Rare | **Eternal City Core** | Habitat · Culture | Every turn | 41.6 | 44.1 | 0.99 | End of each turn: if network buildings from all three active clans activated this turn, +10; otherwise +2 per clan that did. Prevents the first Integrity loss each era. |
+| Early | Common | **Pressure Dome** | Habitat · Pressure | Every turn | 22.8 | 23.9 | 1.09 | On Build: Pressurize this and adjacent hexes. Every turn: +1 per adjacent building on a Pressurized hex (max 2). |
+| Early | Common | **Airlock Junction** | Habitat · Link | Every 2 | 17.7 | 18.2 | 0.84 | Link. On Build: Pressurize this hex. Reactive: When a Habitat joins its network, +2. Every 2 turns: +1 per Habitat in its network (max 2). |
+| Early | Common | **Pioneer Quarters** | Habitat · Citizen | Every 2 | 20.4 | 19.3 | 0.41 | Every 2 turns: +2 per adjacent building on a Pressurized hex (max 3). |
+| Early | Common | **Community Galley** | Habitat · Bio | Every 3 | 18.5 | 17.8 | 0.41 | Reactive: When Water, Biomass, Fuel or Cargo is consumed within range 2, +4. Every 3 turns: +2 per adjacent Habitat (max 3). |
+| Early | Uncommon | **Beacon Plaza** | Culture · Signal | Every turn | 25.0 | 28.3 | 0.84 | Spotlight: each turn the Plaza celebrates the next active clan in rotation. End of each turn: +1 per spotlit-clan building that activated within range 2 (max 3); +2 more if every active clan activated nearby. |
+| Mid | Common | **Life Support Array** | Pressure · Water | Every 2 | 22.8 | 21.9 | 0.61 | On Build: Pressurize this hex. Reactive: When Water within range 2 is consumed, Pressurize adjacent hexes for 3 turns, +5. Every 2 turns: +3 per adjacent Habitat (max 3). |
+| Mid | Uncommon | **Shielded Nursery** | Habitat · Shield | Every 2 | 28.4 | 31.4 | 0.44 | Shields adjacent Habitats from impacts and tremors. Every 2 turns: +4 per adjacent Habitat (max 3). |
+| Mid | Common | **Transit Causeway** | Link · Habitat | Every turn | 22.2 | 21.6 | 1.00 | Link (reach 3). Every turn: +1 per Pressurized Habitat in its network (max 3). |
+| Mid | Uncommon | **Spaceport Canteen** | Trade · Culture | Every 2 | 27.0 | 30.1 | 0.47 | Reactive: Whenever Cargo arrives in orbit anywhere, the crew runs up a tab (max 3). Every 2 turns: settle up, +4 per tab, plus +2 per Cargo or adjacent Habitat (max 3). |
+| Mid | Uncommon | **Education Spire** | Culture · Signal | Every turn | 29.9 | 30.6 | 0.90 | End of each turn: with 3+ distinct tags activated within range 2 this turn, +2 and draw an extra card next turn; with 6+, +5 instead. |
+| Advanced | Common | **Thermal Commons** | Heat · Habitat | Every 2 | 23.0 | 21.1 | 0.61 | On Build: Pressurize this hex. Every 2 turns: +5 per adjacent Habitat (max 3), +4 if an adjacent hex is Hot. Reactive: When a hex within range 2 is cooled, +5 and Pressurize adjacent hexes for 3 turns. |
+| Advanced | Rare | **Embassy Cluster** | Habitat · Culture | Every 2 | 41.8 | 39.9 | 0.47 | Every 2 turns: +5 per distinct active clan among buildings within range 2 (max 3). |
+| Advanced | Rare | **Arcology Stack** | Habitat · Pressure | Every turn | 34.1 | 27.6 | 1.09 | On Build: Pressurize this and adjacent hexes. Every turn: +3 per adjacent Pressurized Habitat (max 2); +3 more if its network spans Surface and Cavern. |
+| Advanced | Uncommon | **Stargazer Memorial** | Culture · Orbit | Every turn | 27.8 | 24.8 | 0.99 | Every turn: +2 per Habitat within range 2 (max 3). Reactive: When a meteor lands within range 3 without destroying anything, +8. |
+| Advanced | Rare | **Eternal City Core** | Habitat · Culture | Every turn | 41.6 | 50.9 | 1.02 | End of each turn: if network buildings from all three active clans activated this turn, +10; otherwise +2 per clan that did. Prevents the first Integrity loss each era. |
 
 ### 🔮 Umbra Institute — Anomaly Researchers
 
@@ -276,21 +276,21 @@ Radiation, anomalies, time and rule-bending repeats.
 
 | Tier | Rarity | Building | Tags | Trigger | PP | Meas. | Act/turn | Effect |
 |---|---|---|---|---|---|---|---|---|
-| Early | Common | **Radiation Siphon** | Radiation · Power | Every 2 | 18.8 | 19.6 | 0.69 | Reactive: When Radiation appears within range 2, remove it, +3. Every 2 turns: +1 per Anomaly or Radiated hex within range 2 (max 3). |
-| Early | Common | **Void Prism** | Crystal · Exotic | Reactive | 21.6 | 22.6 | 0.26 | Reactive: When this hex enters Shadow, +3 plus +3 per adjacent Crystal or Anomaly (max +12). |
-| Early | Common | **Paradox Marker** | Exotic · Signal | Reactive | 20.4 | 20.1 | 0.34 | Reactive: When a resource transforms within range 2, +4; +3 more if it is the same transformation as the previous one it saw. |
-| Early | Common | **Rift Ward** | Shield · Exotic | Every 3 | 20.8 | 21.1 | 0.38 | Guard: Protects buildings within range 1 from meteors, irradiating the impact hex instead, +5. Every 3 turns: +2 per adjacent building (max 3). |
-| Early | Uncommon | **Entropy Probe** | Exotic · Mining | Every 2 | 29.9 | 29.5 | 0.55 | Reactive: When a Cavern is excavated within range 2, seed an Anomaly in it (+6) or +2 if occupied. Every 2 turns: +3 per Anomaly within range 2 (max 3). |
-| Mid | Uncommon | **Temporal Loop** | Time · Power | Every 2 | 27.7 | 29.2 | 0.54 | Every 2 turns: Repeat the most recently activated building within range 2 and irradiate its hex. +6. |
-| Mid | Common | **Darklight Condenser** | Cold · Exotic | Reactive | 18.1 | 18.8 | 0.70 | Reactive: Once per turn, when an adjacent hex enters Shadow, +3 and chill it (Cold). |
-| Mid | Uncommon | **Antimatter Trap** | Exotic · Fuel | Every 2 | 29.1 | 28.5 | 0.49 | Every 2 turns: Turn a Gas or Fuel within range 2 into an Anomaly, +12, and irradiate this hex. Otherwise +2 per Anomaly within range 2 (max 2). |
-| Mid | Common | **Probability Lens** | Crystal · Signal | Every 2 | 18.0 | 17.1 | 0.57 | Every 2 turns: +2 (+2 more beside a Crystal) and draw an extra card next turn. |
-| Mid | Common | **Decay Observatory** | Time · Signal | Every 2 | 21.7 | 22.4 | 0.66 | Every 2 turns: +2 per Radiated hex within range 2 (max 3), min +1. Reactive: When a building within range 2 is destroyed, +5 and draw an extra card. |
-| Advanced | Uncommon | **Phase Inverter** | Time · Heat | Every 2 | 29.2 | 30.5 | 0.54 | Every 2 turns: Swap Hot↔Cold on up to 3 adjacent hexes (+5 each; triggers Heat and Cooling). If none changed, chill all adjacent hexes, +3. |
-| Advanced | Uncommon | **Uncertainty Gate** | Exotic · Orbit | Every turn | 27.3 | 28.5 | 1.01 | Buildings next to an Anomaly join its network. Every turn: +3 per Anomaly within range 3 (max 3). |
-| Advanced | Rare | **Event Horizon Lab** | Exotic · Radiation | Every 2 | 38.0 | 39.8 | 0.50 | Every 2 turns: +5 per Radiated hex within range 2 (max 5), min +3. With 4+, lose 1 Integrity. |
-| Advanced | Rare | **Causality Engine** | Time · Automation | Every 2 | 36.2 | 35.4 | 0.56 | Reactive: Once per turn, when a building within range 2 is repeated, consume an adjacent Anomaly to give it one extra activation beyond its cap, +14. Every 2 turns: +9 per Anomaly within range 2 (max 3). |
-| Advanced | Rare | **Zero-Point Beacon** | Exotic · Power | Every 2 | 40.0 | 38.7 | 0.74 | Every 2 turns: Repeat one different building within range 2 per distinct resource type within range 2 (max 4); +3 per repeat. Irradiates this hex. |
+| Early | Common | **Radiation Siphon** | Radiation · Power | Every 2 | 18.8 | 25.3 | 0.84 | Reactive: When Radiation appears within range 2, remove it, +3. Every 2 turns: +1 per Anomaly or Radiated hex within range 2 (max 3). |
+| Early | Common | **Void Prism** | Crystal · Exotic | Reactive | 21.6 | 22.5 | 0.26 | Reactive: When this hex enters Shadow, +3 plus +3 per adjacent Crystal or Anomaly (max +12). |
+| Early | Common | **Paradox Marker** | Exotic · Signal | Reactive | 20.4 | 24.8 | 0.44 | Reactive: When a resource transforms within range 2, +4; +3 more if it is the same transformation as the previous one it saw. |
+| Early | Common | **Rift Ward** | Shield · Exotic | Every 3 | 20.8 | 23.7 | 0.40 | Guard: Protects buildings within range 1 from meteors, irradiating the impact hex instead, +5. Every 3 turns: +2 per adjacent building (max 3). |
+| Early | Uncommon | **Entropy Probe** | Exotic · Mining | Every 2 | 29.9 | 25.9 | 0.62 | Reactive: When a Cavern is excavated within range 2, seed an Anomaly in it (+6) or +2 if occupied. Every 2 turns: +3 per Anomaly within range 2 (max 3). Entropy wins: with 2 or more in range, the nearest Anomaly then collapses into Wreckage. |
+| Mid | Uncommon | **Temporal Loop** | Time · Power | Every 2 | 27.7 | 25.7 | 0.48 | Every 2 turns: Repeat the most recently activated building within range 2 and irradiate its hex. +6. |
+| Mid | Common | **Darklight Condenser** | Cold · Exotic | Reactive | 18.1 | 17.6 | 0.65 | Reactive: Once per turn, when an adjacent hex enters Shadow, +3 and chill it (Cold). |
+| Mid | Uncommon | **Antimatter Trap** | Exotic · Fuel | Every 2 | 29.1 | 33.1 | 0.65 | Every 2 turns: Turn a Gas or Fuel within range 2 into an Anomaly, +12, and irradiate this hex. Otherwise +2 per Anomaly within range 2 (max 2). |
+| Mid | Common | **Probability Lens** | Crystal · Signal | Every 2 | 18.0 | 20.9 | 0.72 | Every 2 turns: +2 (+2 more beside a Crystal) and draw an extra card next turn. |
+| Mid | Common | **Decay Observatory** | Time · Signal | Every 2 | 21.7 | 24.5 | 0.68 | Every 2 turns: +2 per Radiated hex within range 2 (max 3), min +1. Reactive: When a building within range 2 is destroyed, +5 and draw an extra card. |
+| Advanced | Uncommon | **Phase Inverter** | Time · Heat | Every 2 | 29.2 | 32.6 | 0.56 | Every 2 turns: Swap Hot↔Cold on up to 3 adjacent hexes (+5 each; triggers Heat and Cooling). If none changed, chill all adjacent hexes, +3. |
+| Advanced | Uncommon | **Uncertainty Gate** | Exotic · Orbit | Every turn | 27.3 | 28.0 | 1.02 | Buildings next to an Anomaly join its network. Every turn: +3 per Anomaly within range 3 (max 3). |
+| Advanced | Rare | **Event Horizon Lab** | Exotic · Radiation | Every 2 | 38.0 | 35.7 | 0.58 | Every 2 turns: +5 per Radiated hex within range 2 (max 5), min +3. With 4+, lose 1 Integrity. |
+| Advanced | Rare | **Causality Engine** | Time · Automation | Every 2 | 36.2 | 33.9 | 0.51 | Reactive: Once per turn, when a building within range 2 is repeated, consume an adjacent Anomaly to give it one extra activation beyond its cap, +14. Every 2 turns: +9 per Anomaly within range 2 (max 3). |
+| Advanced | Rare | **Zero-Point Beacon** | Exotic · Power | Every 2 | 44.6 | 29.4 | 0.50 | Every 2 turns: Vacuum fluctuation – with fewer than 3 resource types within range 2, conjure an Anomaly (or Dust) nearby. Then repeat one different building within range 2 per distinct resource type within range 2 (max 4); +3 per repeat. Irradiates this hex. |
 
 ## 6. Re-running
 

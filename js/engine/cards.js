@@ -16,9 +16,9 @@
 // Effects receive `a`, the engine API (see colony.js mkApi).
 
 export const CLANS = {
-  iron: { n: 'Ironwake Union', s: 'Excavators', col: '#d98b45', ic: '⛏️', d: 'Ore, Caverns, Alloy and Anchors. Take a deposit\'s value now or keep it for later.' },
+  iron: { n: 'Ironwake Union', s: 'Excavators', col: '#d98b45', ic: '⛏️', d: 'Ore, Caverns, Alloy and Anchors. Take a deposit\'s value now or keep it for later. Mine tunnels: Ironwake buildings on or beside a Cavern connect to every other building on or beside a Cavern.' },
   helio: { n: 'Heliarch Array', s: 'Sunforged', col: '#f4c84a', ic: '☀️', d: 'Sunlight, Heat and Power. Build for the next light phase, not only this turn.' },
-  cryo: { n: 'Cryostead Enclave', s: 'Frostkeepers', col: '#79d0f2', ic: '❄️', d: 'Ice and Water cycles, Shadow and Cold. Consume Ice now or keep it as a recurring source.' },
+  cryo: { n: 'Cryostead Enclave', s: 'Frostkeepers', col: '#79d0f2', ic: '❄️', d: 'Ice and Water cycles, Shadow and Cold. Consume Ice now or keep it as a recurring source. Ice bridges: Cryostead buildings connect to any building touching the same Ice or Water.' },
   verd: { n: 'Verdant Exodus', s: 'Terraformers', col: '#6fcf73', ic: '🌱', d: 'Bio-Loam, Biomass, Pressure and growth chains.' },
   syn: { n: 'Synapse Circuit', s: 'Machine Minds', col: '#a68cff', ic: '🧠', d: 'Signals, networks and repeat activations that make other buildings stronger.' },
   wreck: { n: 'Wreckborn Fleet', s: 'Reclaimers', col: '#e5765b', ic: '♻️', d: 'Scrap, salvage and demolition. Sometimes tearing down pays more than keeping.' },
@@ -95,15 +95,22 @@ const list = [
   },
   {
     id: 'pit_drill', n: 'Pit Drill', cl: 'iron', t: 'E', r: 'C', tags: ['Mining', 'Metal'], trig: 'every', every: 2, pts: 6,
-    text: 'Every 2 turns: Extract one unit of an Ore deposit within range 2 into Metal. +6 (+3 more for Gold).',
+    text: 'Every 2 turns: Extract one unit of an Ore deposit within range 2 into Metal. +6 (+3 more for Gold). With no Ore in reach, it bores deeper once: its range grows by 1 for good, and Ore only the bore reaches scores +3.',
     run(a) {
-      const ks = a.resNear(a.k, '#Ore', a.R(2)).sort((x, y) => (a.res(y) === 'Gold') - (a.res(x) === 'Gold'));
-      if (!ks.length) return;
+      const m = a.mem();
+      const r = a.R(2);
+      const far = (k) => a.dist(k, a.k) > r;
+      const ks = a.resNear(a.k, '#Ore', r + (m.deep || 0)).sort((x, y) => far(x) - far(y) || (a.res(y) === 'Gold') - (a.res(x) === 'Gold'));
+      if (!ks.length) {
+        if (!m.deep) { m.deep = 1; a.note('bores deeper'); }
+        return;
+      }
       const g = a.res(ks[0]) === 'Gold';
+      const deep = far(ks[0]);
       a.transform(ks[0], 'Metal');
-      a.score(6 + (g ? 3 : 0));
+      a.score(deep ? 3 : 6 + (g ? 3 : 0));
     },
-    rb: { p: 6.5, u: 1, rel: 0.36, why: 'Starter. Each Ore deposit holds 3 units; needs Ore within range 2.' },
+    rb: { p: 6.5, u: 1, rel: 0.4, why: 'Starter. Each Ore deposit holds 3 units; bores deeper once when its reach runs dry.' },
   },
   {
     id: 'gravity_anchor', n: 'Gravity Anchor', cl: 'iron', t: 'E', r: 'C', tags: ['Anchor', 'Structure'], trig: 'every', every: 3, pts: 2,
@@ -145,7 +152,7 @@ const list = [
   },
   {
     id: 'mantle_cutter', n: 'Mantle Cutter', cl: 'iron', t: 'M', r: 'C', tags: ['Mining', 'Heat'], trig: 'every', every: 2, pts: 6,
-    text: 'On Build: Excavate up to 2 adjacent Rock hexes into Hot Caverns, +7 each. Every 2 turns: excavate one more adjacent Rock (Hot), +7.',
+    text: 'On Build: Excavate up to 2 adjacent Rock hexes into Hot Caverns, +7 each. Every 2 turns: excavate one more adjacent Rock (Hot), +7. With no Rock left, it taps the heat instead: +1 per adjacent Hot hex (max 2).',
     build(a) {
       let n = 0;
       for (const k of a.near(a.k, a.R(1))) {
@@ -156,9 +163,11 @@ const list = [
     },
     run(a) {
       const k = a.near(a.k, a.R(1)).find((x) => a.kind(x) === 'rock');
-      if (k) { a.excavate(k); a.addSt(k, 'Hot'); a.score(7); }
+      if (k) { a.excavate(k); a.addSt(k, 'Hot'); a.score(7); return; }
+      const hot = Math.min(2, a.near(a.k, 1).filter((x) => a.st(x, 'Hot')).length);
+      if (hot) a.score(hot);
     },
-    rb: { once: 9, p: 5, rel: 0.15, u: 2, why: 'Caverns + Heat + buried deposits; finite rock supply.' },
+    rb: { once: 9, p: 5, rel: 0.2, u: 2, why: 'Caverns + Heat + buried deposits; finite rock supply.' },
   },
   {
     id: 'magnetic_separator', n: 'Magnetic Separator', cl: 'iron', t: 'M', r: 'U', tags: ['Metal', 'Industry'], trig: 'every', every: 2, pts: 5,
@@ -266,10 +275,11 @@ const list = [
     rb: { p: 3, rel: 0.63, u: 1, why: 'Extends Sunlit uptime for neighbours and scores per Solar neighbour.' },
   },
   {
-    id: 'radiator_fin', n: 'Radiator Fin', cl: 'helio', t: 'E', r: 'C', tags: ['Cold', 'Power'], trig: 'event', pts: 3,
-    text: 'Reactive: When a hex within range 2 becomes Hot, cool it and score +3 (triggers On Cooling).',
-    L: [{ on: 'heat', r: 2, run(a, b, ev) { a.rmSt(ev.k, 'Hot'); a.score(3); } }],
-    rb: { react: { p: 3, rate: 0.34 }, u: 1, why: 'Heat sink; converts Hot into Cooling triggers.' },
+    id: 'radiator_fin', n: 'Radiator Fin', cl: 'helio', t: 'E', r: 'C', tags: ['Cold', 'Power'], trig: 'shadow', pts: 3,
+    text: 'Reactive: When a hex within range 2 becomes Hot, cool it, bank the heat (max 3) and score +3 (triggers On Cooling). Each Shadow turn: radiate the bank, +2 per heat stored.',
+    L: [{ on: 'heat', r: 2, run(a, b, ev) { const m = a.mem(); m.heat = Math.min(3, (m.heat || 0) + 1); a.rmSt(ev.k, 'Hot'); a.score(3); } }],
+    run(a) { const m = a.mem(); if (m.heat) { a.score(2 * m.heat); m.heat = 0; } },
+    rb: { p: 2, rel: 0.68, react: { p: 3, rate: 0.34 }, u2: 1, why: 'Heat sink; banks Hot and pays it out after sunset; rel ≈ heat banked per Shadow turn.' },
   },
   {
     id: 'photon_kiln', n: 'Photon Kiln', cl: 'helio', t: 'E', r: 'C', tags: ['Heat', 'Industry'], trig: 'event', pts: 3,
@@ -385,9 +395,12 @@ const list = [
   // ======================= CRYOSTEAD ENCLAVE =======================
   {
     id: 'ice_harvester', n: 'Ice Harvester', cl: 'cryo', t: 'E', r: 'C', tags: ['Ice', 'Extraction'], trig: 'every', every: 2, pts: 6,
-    text: 'Every 2 turns: Melt one unit of an Ice within range 2 into Water. +6.',
-    run(a) { if (convert(a, 'Ice', 'Water', 2)) a.score(6); },
-    rb: { p: 6, u: 1.5, rel: 0.27, why: 'Starter. Ice deposits hold 3 units; refrozen Ice makes it renewable.' },
+    text: 'Every 2 turns: Melt one unit of an Ice within range 2 into Water. +6. With no Ice in range, on a Shadow turn it refreezes a Water within range 2 into Ice instead, +2.',
+    run(a) {
+      if (convert(a, 'Ice', 'Water', 2)) return a.score(6);
+      if (!a.lit(a.k) && convert(a, 'Water', 'Ice', 2)) a.score(2);
+    },
+    rb: { p: 6, u: 1.5, rel: 0.36, why: 'Starter. Ice deposits hold 3 units; it refreezes its own Water in Shadow, so the cycle renews.' },
   },
   {
     id: 'shade_screen', n: 'Shade Screen', cl: 'cryo', t: 'E', r: 'C', tags: ['Cold', 'Structure'], trig: 'every', every: 2, pts: 2,
@@ -511,13 +524,13 @@ const list = [
   // ======================= VERDANT EXODUS =======================
   {
     id: 'spore_seeder', n: 'Spore Seeder', cl: 'verd', t: 'E', r: 'C', tags: ['Bio', 'Growth'], trig: 'every', every: 2, pts: 6,
-    text: 'On Build: Turn up to 2 adjacent Organic Seam/Bio-Loam units into Biomass, +3 each. Every 2 turns: convert one within range 2 (+6); if none, seed an Organic Seam on an adjacent empty hex (+3).',
+    text: 'On Build: Turn up to 2 adjacent Organic Seam/Bio-Loam units into Biomass, +3 each. Every 2 turns: convert one within range 2 (+6); if none, the spores drift and seed an Organic Seam on an empty hex within range 2 (+3).',
     build(a) { let n = 0; for (const k of a.resNear(a.k, ['Seam', 'Loam'], 1)) { if (n++ >= 2) break; a.transform(k, 'Biomass'); a.score(3); } },
     run(a) {
       if (convert(a, ['Seam', 'Loam'], 'Biomass', 2)) return a.score(6);
-      if (a.create('Seam', a.k, 1)) a.score(3);
+      if (a.create('Seam', a.k, 2)) a.score(3);
     },
-    rb: { once: 4, p: 3.4, u: 1.5, rel: 0.22, why: 'Starter: self-sustaining seed → Biomass loop.' },
+    rb: { once: 4, p: 3.4, u: 1.5, rel: 0.26, why: 'Starter: self-sustaining seed → Biomass loop.' },
   },
   {
     id: 'algae_tank', n: 'Algae Tank', cl: 'verd', t: 'E', r: 'C', tags: ['Bio', 'Water'], trig: 'every', every: 2, pts: 6,
@@ -616,7 +629,7 @@ const list = [
   },
   {
     id: 'worldroot', n: 'Worldroot', cl: 'verd', t: 'A', r: 'U', tags: ['Bio', 'Anchor'], trig: 'every', every: 2, pts: 5,
-    text: 'On Build: Stabilize adjacent hexes (+2 per Cavern or Unstable hex). Reactive: When Biomass appears within range 2, make that hex Stable, +5. Every 2 turns: +4 per adjacent Bio building or Biomass (max 3).',
+    text: 'On Build: Stabilize adjacent hexes (+2 per Cavern or Unstable hex). Reactive: When Biomass appears within range 2, make that hex Stable, +5. Every 2 turns: the roots creep – with fewer than 3 adjacent Bio buildings or Biomass, plant Biomass beside it; then +4 per adjacent Bio building or Biomass (max 3).',
     build(a) {
       let s = 0;
       for (const k of a.near(a.k, 1)) {
@@ -628,8 +641,13 @@ const list = [
       a.score(Math.max(2, s));
     },
     L: [{ on: 'create', r: 2, run(a, b, ev) { if (ev.res === 'Biomass') { a.addSt(ev.k, 'Stable'); a.score(5); } } }],
-    run(a) { const n = Math.min(3, a.bldNear(a.k, '#Bio', 1).length + a.resNear(a.k, 'Biomass', 1).length); if (n) a.score(4 * n); },
-    rb: { once: 3, p: 8, rel: 0.52, react: { p: 5, rate: 0.3 }, u: 0.5, why: 'Bio Anchor; counts for Aurelia stabilization.' },
+    run(a) {
+      const count = () => Math.min(3, a.bldNear(a.k, '#Bio', 1).length + a.resNear(a.k, 'Biomass', 1).length);
+      if (count() < 3) a.create('Biomass', a.k, 1);
+      const n = count();
+      if (n) a.score(4 * n);
+    },
+    rb: { once: 3, p: 8, rel: 0.6, react: { p: 5, rate: 0.3 }, u: 0.5, why: 'Bio Anchor; counts for Aurelia stabilization.' },
   },
   {
     id: 'living_shipyard', n: 'Living Shipyard', cl: 'verd', t: 'A', r: 'R', tags: ['Bio', 'Orbital'], trig: 'every', every: 2, pts: 16,
@@ -828,9 +846,9 @@ const list = [
   },
   {
     id: 'breaker_yard', n: 'Breaker Yard', cl: 'wreck', t: 'E', r: 'C', tags: ['Salvage', 'Metal'], trig: 'every', every: 2, pts: 8,
-    text: 'Every 2 turns: Break one unit of a Wreckage within range 2 into Scrap. +8.',
-    run(a) { if (convert(a, 'Wreck', 'Scrap', 2)) a.score(8); },
-    rb: { p: 8, u: 1, rel: 0.22, why: 'Starter. Wreckage holds 3 units.' },
+    text: 'Every 2 turns: Break one unit of a Wreckage within range 2 into Scrap. +8. If there is none, pick through the yard instead, +2.',
+    run(a) { a.score(convert(a, 'Wreck', 'Scrap', 2) ? 8 : 2); },
+    rb: { p: 8, u: 1, rel: 0.4, why: 'Starter. Wreckage holds 3 units; the +2 fallback is folded into rel.' },
   },
   {
     id: 'debris_mill', n: 'Debris Mill', cl: 'wreck', t: 'M', r: 'C', tags: ['Salvage', 'Dust'], trig: 'every', every: 2, pts: 8,
@@ -860,10 +878,10 @@ const list = [
   },
   {
     id: 'blast_fence', n: 'Blast Fence', cl: 'wreck', t: 'M', r: 'U', tags: ['Shield', 'Structure'], trig: 'every', every: 2, pts: 2,
-    text: 'Every 2 turns: +2 per adjacent building (max 4). Guard: A meteor within range 2 hits the Fence instead – it is destroyed, leaves 2 Scrap, and scores +6.',
-    run(a) { const n = countNear(a, null, 1, 4); if (n) a.score(2 * n); },
+    text: 'Every 2 turns: +1, plus +2 per adjacent building (max 4). Guard: A meteor within range 2 hits the Fence instead – it is destroyed, leaves 2 Scrap, and scores +6.',
+    run(a) { a.score(1 + 2 * countNear(a, null, 1, 4)); },
     guard: { r: 2, run(a) { const k = a.k; a.destroy(a.b); a.createAt('Scrap', k); a.create('Scrap', k, 1); a.score(6); } },
-    rb: { p: 4.6, rel: 0.96, once: 5, why: 'Insurance that turns into salvage.' },
+    rb: { p: 5.6, rel: 0.96, once: 5, why: 'Insurance that turns into salvage.' },
   },
   {
     id: 'reclaimer_loop', n: 'Reclaimer Loop', cl: 'wreck', t: 'M', r: 'U', tags: ['Scrap', 'Automation'], trig: 'every', every: 3, pts: 6,
@@ -915,10 +933,10 @@ const list = [
   },
   {
     id: 'phoenix_ark', n: 'Phoenix Ark', cl: 'wreck', t: 'A', r: 'R', tags: ['Salvage', 'Habitat'], trig: 'every', every: 2, pts: 8,
-    text: 'Reactive: Once per turn, when a friendly building within range 2 is destroyed, return its card to your hand, +10. Every 2 turns: +5 per adjacent building (max 3).',
+    text: 'Reactive: Once per turn, when a friendly building within range 2 is destroyed, return its card to your hand, +10. Every 2 turns: +6 per adjacent building (max 3).',
     L: [{ on: 'destroy', r: 2, run(a, b, ev) { if (ev.card !== 'beacon' && a.once('px')) { a.toHand(ev.card); a.score(10); } } }],
-    run(a) { const n = countNear(a, null, 1, 3); if (n) a.score(5 * n); },
-    rb: { p: 10, rel: 0.52, react: { p: 10, rate: 0.09 }, u: 6, why: 'Card recursion.' },
+    run(a) { const n = countNear(a, null, 1, 3); if (n) a.score(6 * n); },
+    rb: { p: 12, rel: 0.52, react: { p: 10, rate: 0.09 }, u: 6, why: 'Card recursion.' },
   },
 
   // ======================= KEPLER CARTOGRAPHERS =======================
@@ -941,9 +959,9 @@ const list = [
   },
   {
     id: 'microthruster', n: 'Microthruster', cl: 'kep', t: 'E', r: 'C', tags: ['Motion', 'Power'], trig: 'every', every: 4, pts: 2,
-    text: 'Every 4 turns: Nudge the asteroid – the light advances one extra phase (rotation triggers fire). +6.',
-    run(a) { a.rotateLight(); a.score(6); },
-    rb: { p: 3, u: 3, rel: 1.5, why: 'Extra rotation is a global trigger for Heliarch/Cryostead/Umbra.' },
+    text: 'Every 4 turns: Nudge the asteroid – the light advances one extra phase (rotation triggers fire). +7.',
+    run(a) { a.rotateLight(); a.score(7); },
+    rb: { p: 3.5, u: 3, rel: 1.5, why: 'Extra rotation is a global trigger for Heliarch/Cryostead/Umbra.' },
   },
   {
     id: 'radar_dish', n: 'Radar Dish', cl: 'kep', t: 'E', r: 'C', tags: ['Signal', 'Orbital'], trig: 'every', every: 3, pts: 3, radar: true,
@@ -1089,13 +1107,16 @@ const list = [
   },
   {
     id: 'beacon_plaza', n: 'Beacon Plaza', cl: 'hearth', t: 'E', r: 'U', tags: ['Culture', 'Signal'], trig: 'turn', pts: 1, late: true,
-    text: 'End of each turn: +1 per distinct clan whose buildings activated within range 2 this turn (max 3), +2 more with all three.',
+    text: 'Spotlight: each turn the Plaza celebrates the next active clan in rotation. End of each turn: +1 per spotlit-clan building that activated within range 2 (max 3); +2 more if every active clan activated nearby.',
     run(a) {
-      const s = new Set(a.tstat.acts.filter((e) => e.clan !== 'neutral' && a.dist(e.k, a.k) <= 2).map((e) => e.clan));
-      const n = Math.min(3, s.size);
-      if (n) a.score(n + (n === 3 ? 2 : 0));
+      const star = a.clans[a.turn % a.clans.length];
+      const near = a.tstat.acts.filter((e) => e.clan !== 'neutral' && a.dist(e.k, a.k) <= 2);
+      const n = Math.min(3, new Set(near.filter((e) => e.clan === star).map((e) => e.id)).size);
+      const all = a.clans.every((c) => near.some((e) => e.clan === c));
+      if (n) a.note(`spotlight ${star}`);
+      a.score(n + (all ? 2 : 0));
     },
-    rb: { p: 2.6, rel: 1.04, why: 'Cross-clan reward.' },
+    rb: { p: 2.6, rel: 0.8, why: 'Cross-clan reward; one clan in the spotlight per turn.' },
   },
   {
     id: 'life_support_array', n: 'Life Support Array', cl: 'hearth', t: 'M', r: 'C', tags: ['Pressure', 'Water'], trig: 'every', every: 2, pts: 5,
@@ -1120,10 +1141,16 @@ const list = [
   },
   {
     id: 'spaceport_canteen', n: 'Spaceport Canteen', cl: 'hearth', t: 'M', r: 'U', tags: ['Trade', 'Culture'], trig: 'every', every: 2, pts: 6,
-    text: 'Reactive: Whenever Cargo arrives in orbit anywhere, +6. Every 2 turns: +2 per Cargo or adjacent Habitat (max 3).',
-    L: [{ on: 'arrival', r: 'map', run(a) { a.score(6); } }],
-    run(a) { const n = Math.min(3, a.allRes('Cargo').length + a.bldNear(a.k, '#Habitat', 1).length); if (n) a.score(2 * n); },
-    rb: { react: { p: 6, rate: 0.4 }, p: 3, rel: 0.6, why: 'Global Arrival payoff.' },
+    text: 'Reactive: Whenever Cargo arrives in orbit anywhere, the crew runs up a tab (max 3). Every 2 turns: settle up, +4 per tab, plus +2 per Cargo or adjacent Habitat (max 3).',
+    L: [{ on: 'arrival', r: 'map', run(a) { const m = a.mem(); m.tab = Math.min(3, (m.tab || 0) + 1); } }],
+    run(a) {
+      const m = a.mem();
+      const n = Math.min(3, a.allRes('Cargo').length + a.bldNear(a.k, '#Habitat', 1).length);
+      if (m.tab) a.note(`tab ×${m.tab}`);
+      a.score(4 * (m.tab || 0) + 2 * n);
+      m.tab = 0;
+    },
+    rb: { p: 6, why: 'Global Arrival payoff, banked and paid out every other turn (≈0.8 tabs + 1.5 Cargo/Habitat).' },
   },
   {
     id: 'education_spire', n: 'Education Spire', cl: 'hearth', t: 'M', r: 'U', tags: ['Culture', 'Signal'], trig: 'turn', pts: 4, late: true,
@@ -1219,9 +1246,14 @@ const list = [
   },
   {
     id: 'entropy_probe', n: 'Entropy Probe', cl: 'umbra', t: 'E', r: 'U', tags: ['Exotic', 'Mining'], trig: 'every', every: 2, pts: 6,
-    text: 'Reactive: When a Cavern is excavated within range 2, seed an Anomaly in it (+6) or +2 if occupied. Every 2 turns: +3 per Anomaly within range 2 (max 3).',
+    text: 'Reactive: When a Cavern is excavated within range 2, seed an Anomaly in it (+6) or +2 if occupied. Every 2 turns: +3 per Anomaly within range 2 (max 3). Entropy wins: with 2 or more in range, the nearest Anomaly then collapses into Wreckage.',
     L: [{ on: 'excavate', r: 2, run(a, b, ev) { if (a.createAt('Anomaly', ev.k)) a.score(6); else a.score(2); } }],
-    run(a) { const n = resCount(a, 'Anomaly', 2, 3); if (n) a.score(3 * n); },
+    run(a) {
+      const ks = a.resNear(a.k, 'Anomaly', 2);
+      const n = Math.min(3, ks.length);
+      if (n) a.score(3 * n);
+      if (ks.length >= 2) a.transform(ks.sort((x, y) => a.dist(x, a.k) - a.dist(y, a.k))[0], 'Wreck');
+    },
     rb: { p: 4.5, rel: 0.54, react: { p: 6, rate: 0.13 }, u: 1, why: 'Ironwake crossover; makes Anomalies.' },
   },
   {
@@ -1307,9 +1339,13 @@ const list = [
   },
   {
     id: 'zero_point_beacon', n: 'Zero-Point Beacon', cl: 'umbra', t: 'A', r: 'R', tags: ['Exotic', 'Power'], trig: 'every', every: 2, pts: 4, cap: 3,
-    text: 'Every 2 turns: Repeat one different building within range 2 per distinct resource type within range 2 (max 4); +3 per repeat. Irradiates this hex.',
+    text: 'Every 2 turns: Vacuum fluctuation – with fewer than 3 resource types within range 2, conjure an Anomaly (or Dust) nearby. Then repeat one different building within range 2 per distinct resource type within range 2 (max 4); +3 per repeat. Irradiates this hex.',
     run(a) {
-      const types = new Set(a.near(a.k, 2).map((k) => a.res(k)).filter(Boolean));
+      let types = new Set(a.near(a.k, 2).map((k) => a.res(k)).filter(Boolean));
+      if (types.size < 3) {
+        a.create(types.has('Anomaly') ? 'Dust' : 'Anomaly', a.k, 2);
+        types = new Set(a.near(a.k, 2).map((k) => a.res(k)).filter(Boolean));
+      }
       let n = 0; const done = [];
       for (let i = 0; i < Math.min(4, types.size); i++) {
         const r = repeatOne(a, null, 2, done);
@@ -1318,7 +1354,7 @@ const list = [
       }
       if (n) { a.score(3 * n); a.addSt(a.k, 'Radiation'); }
     },
-    rb: { p: 7, u: 4, rel: 1.38, cost: 1, why: 'Mass repeat; the most explosive Umbra card.' },
+    rb: { p: 7, u: 4, rel: 1.6, cost: 1, why: 'Mass repeat that seeds its own variety; the most explosive Umbra card.' },
   },
 ];
 
@@ -1485,7 +1521,7 @@ const foundry = [
 
 export const BEACON = {
   id: 'beacon', n: 'Charter Beacon', cl: 'neutral', t: 'E', r: 'C', tags: ['Beacon'], trig: 'passive',
-  text: 'The landing zone. Integrate charter stamp: connect buildings from all three active clans into the Beacon\'s network.',
+  text: 'The landing zone. Buildings in the Beacon\'s network score +1 on their first scoring activation each turn. Integrate charter stamp: connect buildings from all three active clans into the Beacon\'s network.',
 };
 
 export const CARDS = {};

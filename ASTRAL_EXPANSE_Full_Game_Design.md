@@ -949,7 +949,7 @@ Mega-Projects are **recognized arrangements**, not standalone cards purchased wi
 | **Deep Biosphere** | 4 connected Bio structures in Stable, Pressurized Caverns | Recurring Influence and extended Pressure |
 | **Orbital Trade Ring** | 3 Orbital structures and a functional Cargo cycle | Every third delivery repeats a Trade scoring event |
 | **Planetary Processor** | 3 connected Mining/Industry structures with two Alloy producers | Every third Metal transformation makes spare Alloy on legal space |
-| **Civilization Nexus** | Connected, Pressurized buildings from each of the three active clans | Strong three-clan bonus and first disaster protection per era |
+| **Civilization Nexus** | Two connected, Pressurized buildings from each of the three active clans | A living council: +1 per seat each turn (lost when a seated building goes), and first disaster protection per era |
 | **Exotic Reactor** | 3 Exotic buildings bordering an Anomaly source | Extra activations with controllable Radiation risk |
 
 **Local technologies / artifacts** are different from the overworld's persistent Clan Enhancements. These are gained *inside one colony* at Influence checkpoints, then vanish when that map ends. Example upgrades: +1 range, temporary extra Charge, +1 tag, thermal immunity, an additional mobile platform, and once-per-era activation echo. They should reinforce the engine that emerged from the actual map, rather than replacing it.

@@ -65,7 +65,7 @@ Each colony is a hex asteroid that you build up one card per turn.
 When you secure a colony you choose its **charter**. It sets which world resource the colony ships home: Mint (Credits), Foundry Works (Alloys), Cryogenic Export Depot (Isotopes), Gene Ark (Gene Archives), Star Observatory (Star Data) or Free Trade Enclave. The one-off **claim shipment** grows with the world's abundance and with two stamps:
 
 - **Specialize:** reach that charter's resource milestone, for example 3 Alloy or 5 Ice↔Water transformations.
-- **Integrate:** connect a building from every active clan to the ★ Charter Beacon.
+- **Integrate:** connect a building from every active clan to the ★ Charter Beacon. Buildings in the Beacon's network also score +1 on their first scoring activation each turn.
 
 ### 5. Build the trade network
 

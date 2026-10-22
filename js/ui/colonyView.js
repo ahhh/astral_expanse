@@ -5,7 +5,7 @@ import { CARDS, CLANS, RARITY, TIER } from '../engine/cards.js';
 import { RES, STATUS, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import * as HX from '../engine/hex.js';
 import {
-  isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, scrapCard, bldAt, bldList, network, links,
+  isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, scrapCard, bldAt, bldList, network, links, beaconLinked, BEACON_BONUS,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
   SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone,
 } from '../engine/colony.js';
@@ -141,6 +141,8 @@ export function colonyScreen(root, S, hooks) {
         S.boss ? h('span', { class: 'chip warn' }, `${BOSS_INFO[S.boss.type].meterName} ${S.boss.type === 'viridion' ? S.boss.clock + '/3' : S.boss.meter + '/' + BOSS_INFO[S.boss.type].max}`) : null));
   }
 
+  // Long-range link styles: [stroke (null = network colour), dash].
+  const LINK_STYLE = { link: [null, '2.2 1.4'], gate: ['#d36bd6', '0.6 1.4'], ice: ['#79d0f2', '0.4 0.9'], tunnel: ['#d98b45', '3 1'] };
   // Network colours: the Beacon's network is white (the Integrate stamp), the
   // rest cycle through hues that read against every clan colour.
   const NET_COLS = ['#6ee7ff', '#ffd166', '#ff7ab6', '#7dffb0', '#c9a2ff', '#ff9f43', '#b8f35a', '#ff6b6b'];
@@ -193,7 +195,8 @@ export function colonyScreen(root, S, hooks) {
       const hx = S.hexes[k];
       const [cx, cy] = HX.pixel(k, SZ);
       const g = s('g', { 'data-k': k });
-      g.append(s('polygon', { points: poly(cx, cy, SZ * 0.98), class: 'hex-base', fill: hx.kind === 'rock' ? 'url(#rockpat)' : KIND_FILL[hx.kind], 'stroke-dasharray': hx.kind === 'orbit' ? '2 1.5' : null, stroke: hx.kind === 'orbit' ? '#4a6aa8' : null }));
+      const empty = !hx.b && !(hx.res && !hx.hid);
+      g.append(s('polygon', { points: poly(cx, cy, SZ * 0.98), class: empty ? 'hex-base hex-empty' : 'hex-base', fill: hx.kind === 'rock' ? 'url(#rockpat)' : KIND_FILL[hx.kind], 'stroke-dasharray': hx.kind === 'orbit' ? '2 1.5' : null, stroke: hx.kind === 'orbit' ? '#4a6aa8' : null }));
       if (hx.kind !== 'rock') {
         const lit = isLit(S, k);
         g.append(s('polygon', { points: poly(cx, cy, SZ * 0.98), fill: lit ? '#ffd27a' : '#000', 'fill-opacity': lit ? 0.09 : 0.38, 'pointer-events': 'none' }));
@@ -292,11 +295,12 @@ export function colonyScreen(root, S, hooks) {
         const [p, q] = [lerp(0.36), lerp(0.64)];
         gNet.append(s('line', { x1: p[0], y1: p[1], x2: q[0], y2: q[1], stroke: '#08101c', 'stroke-width': 2.8, 'stroke-linecap': 'round' }),
           s('line', { x1: p[0], y1: p[1], x2: q[0], y2: q[1], stroke: col, 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
-      } else if (l.how === 'link' || l.how === 'gate') {
+      } else if (LINK_STYLE[l.how]) {
         // Trimmed to start at each tile's edge, clear of the initials.
         const d = Math.hypot(x2 - x1, y2 - y1) || 1;
         const tx = ((x2 - x1) / d) * SZ * 0.62, ty = ((y2 - y1) / d) * SZ * 0.62;
-        gNet.append(s('line', { x1: x1 + tx, y1: y1 + ty, x2: x2 - tx, y2: y2 - ty, stroke: l.how === 'gate' ? '#d36bd6' : col, 'stroke-width': 0.8, 'stroke-dasharray': l.how === 'gate' ? '0.6 1.4' : '2.2 1.4', 'stroke-linecap': 'round', opacity: 0.9 }));
+        const [stroke, dash] = LINK_STYLE[l.how];
+        gNet.append(s('line', { x1: x1 + tx, y1: y1 + ty, x2: x2 - tx, y2: y2 - ty, stroke: stroke || col, 'stroke-width': 0.8, 'stroke-dasharray': dash, 'stroke-linecap': 'round', opacity: 0.9 }));
       } else if (l.how === 'orbit') {
         // Ground buildings that reach the ring get a spoke out to it.
         for (const [x, y] of [[x1, y1], [x2, y2]]) {
@@ -542,6 +546,7 @@ export function colonyScreen(root, S, hooks) {
           h('b', null, 'Influence earned'), h('span', null, b.inf),
           h('b', null, 'Activations'), h('span', null, `${b.acts}/${c.cap || CAP} this turn`),
           h('b', null, 'Network'), h('span', null, net.length ? net.map((x) => CARDS[x.c].n).join(', ') : 'Not connected'),
+          beaconLinked(S, b) ? [h('b', null, 'Beacon link'), h('span', null, `+${BEACON_BONUS} on its first score each turn`)] : null,
           b.dis ? [h('b', null, 'Status'), h('span', { class: 'bad' }, 'Shut down by a Solar Flare')] : null));
         const st = abilityState(S, b);
         if (st) {
@@ -628,6 +633,8 @@ export function colonyScreen(root, S, hooks) {
       row((v) => v.append(s('polygon', { points: hexP(9.3), fill: KIND_FILL.surface, stroke: '#ffd166', 'stroke-width': 0.9 }), s('line', { x1: -10, y1: 0, x2: 10, y2: 0, stroke: '#08101c', 'stroke-width': 2.8, 'stroke-linecap': 'round' }), s('line', { x1: -10, y1: 0, x2: 10, y2: 0, stroke: '#ffd166', 'stroke-width': 1.6, 'stroke-linecap': 'round' })), 'Connected', 'Each network has its own colour halo; bridges join adjacent members. The Beacon’s network is white.'),
       row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('line', { x1: -9, y1: 5, x2: 9, y2: -5, stroke: '#6ee7ff', 'stroke-width': 0.8, 'stroke-dasharray': '2.2 1.4' })), 'Link reach', 'Dashed line: a Link building reaching 2+ hexes.'),
       row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('line', { x1: -9, y1: 5, x2: 9, y2: -5, stroke: '#d36bd6', 'stroke-width': 0.8, 'stroke-dasharray': '0.6 1.4', 'stroke-linecap': 'round' })), 'Anomaly link', 'Dotted magenta: joined through an Uncertainty Gate.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('line', { x1: -9, y1: 5, x2: 9, y2: -5, stroke: '#79d0f2', 'stroke-width': 0.8, 'stroke-dasharray': '0.4 0.9', 'stroke-linecap': 'round' })), 'Ice bridge', 'Pale blue dots: a Cryostead building and another building touching the same Ice or Water.'),
+      row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('line', { x1: -9, y1: 5, x2: 9, y2: -5, stroke: '#d98b45', 'stroke-width': 0.8, 'stroke-dasharray': '3 1', 'stroke-linecap': 'round' })), 'Mine tunnel', 'Copper dashes: an Ironwake building and another building, each on or beside a Cavern.'),
       row((v) => v.append(s('circle', { r: 8, fill: 'none', stroke: '#c9a2ff', 'stroke-width': 0.9, 'stroke-dasharray': '3 2' })), 'Orbital ring', 'Lights up in a network’s colour when orbital buildings connect; dotted spokes show ground buildings tied into it.'),
       h('div', { class: 'sect' }, 'Placing'),
       row((v) => v.append(s('polygon', { points: hexP(9.8), fill: KIND_FILL.surface }), s('polygon', { points: hexP(9.2), class: 'legal top' })), 'Best hexes', 'Gold outline: top three forecasts. Cyan: any legal hex. Badge: 3-turn Influence estimate.'),

@@ -70,13 +70,19 @@ function orbitish(S, b) {
 function nextToAnomaly(S, b) {
   return H.near(S.R, b.k, 1).some((k) => S.hexes[k].res === 'Anomaly' && !S.hexes[k].hid);
 }
+const iceNear = (S, b) => H.near(S.R, b.k, 1).filter((k) => { const h = S.hexes[k]; return !h.hid && (h.res === 'Ice' || h.res === 'Water'); });
 // Buildings are connected when adjacent; Link buildings reach 2 (or `link`);
 // orbit slots and orbit-linking buildings share one ring network; an
-// Uncertainty Gate joins every building next to an Anomaly.
+// Uncertainty Gate joins every building next to an Anomaly; a Cryostead
+// building bridges to any building touching the same Ice or Water; an Ironwake
+// building on or beside a Cavern tunnels to every other such building.
 function nets(S) {
-  if (S._nc && S._nc.v === S.bver) return S._nc.m;
+  const v = S.bver + ':' + (S.rver || 0);
+  if (S._nc && S._nc.v === v) return S._nc.m;
   const bs = bldList(S);
   const gates = bs.filter((b) => card(b).anomLink);
+  const ice = new Map(bs.map((b) => [b.id, iceNear(S, b)]));
+  const cave = new Map(bs.map((b) => [b.id, [b.k].concat(H.near(S.R, b.k, 1)).some((k) => S.hexes[k].kind === 'cavern')]));
   const adj = new Map(bs.map((b) => [b.id, []]));
   const pairs = [];
   for (let i = 0; i < bs.length; i++) {
@@ -89,6 +95,8 @@ function nets(S) {
         const ag = card(a).anomLink, bg = card(b).anomLink;
         if ((ag && nextToAnomaly(S, b)) || (bg && nextToAnomaly(S, a))) how = 'gate';
       }
+      if (!how && (card(a).cl === 'cryo' || card(b).cl === 'cryo') && ice.get(a.id).some((k) => ice.get(b.id).includes(k))) how = 'ice';
+      if (!how && (card(a).cl === 'iron' || card(b).cl === 'iron') && cave.get(a.id) && cave.get(b.id)) how = 'tunnel';
       if (how) { adj.get(a.id).push(b.id); adj.get(b.id).push(a.id); pairs.push({ a: a.id, b: b.id, how }); }
     }
   }
@@ -100,11 +108,12 @@ function nets(S) {
     for (let i = 0; i < comp.length; i++) for (const n of adj.get(comp[i])) if (!seen.has(n)) { seen.add(n); comp.push(n); }
     for (const id of comp) m[id] = comp;
   }
-  Object.defineProperty(S, '_nc', { value: { v: S.bver, m, pairs }, enumerable: false, configurable: true, writable: true });
+  Object.defineProperty(S, '_nc', { value: { v, m, pairs }, enumerable: false, configurable: true, writable: true });
   return m;
 }
 // Every connected pair of buildings and how they connect ('adj', 'link' for
-// Link reach, 'orbit' for the orbital ring, 'gate' for an Uncertainty Gate).
+// Link reach, 'orbit' for the orbital ring, 'gate' for an Uncertainty Gate,
+// 'ice' for a Cryostead ice bridge, 'tunnel' for an Ironwake mine tunnel).
 export function links(S) {
   nets(S);
   return S._nc.pairs;
@@ -114,6 +123,18 @@ export function network(S, b) {
 }
 export function inNet(S, a, b) {
   return (nets(S)[a.id] || []).includes(b.id);
+}
+// Buildings in the Charter Beacon's network score +BEACON_BONUS on their first
+// scoring activation each turn.
+export const BEACON_BONUS = 1;
+export function beaconLinked(S, b) {
+  if (b.c === 'beacon') return false;
+  return network(S, b).some((x) => x.c === 'beacon');
+}
+function beaconBonus(S, b) {
+  if (b.bb === S.turn || !beaconLinked(S, b)) return 0;
+  b.bb = S.turn;
+  return BEACON_BONUS;
 }
 export function orbitLinked(S, b) {
   if (S.hexes[b.k].kind === 'orbit') return true;
@@ -206,7 +227,7 @@ export function activate(S, b, ev, o = {}) {
   }
   if (!ctx.did && ctx.pts <= 0) { b.acts--; return false; }
   const aura = ctx.pts > 0 ? auraBonus(S, b) : 0;
-  const oc = ctx.pts > 0 ? (hasTech(S, 'overclock') && b.acts >= 2 ? 2 : 0) + (hasTech(S, 'shieldgrid') && H.dist(b.k, '0,0') === 1 ? 1 : 0) : 0;
+  const oc = ctx.pts > 0 ? (hasTech(S, 'overclock') && b.acts >= 2 ? 2 : 0) + (hasTech(S, 'shieldgrid') && H.dist(b.k, '0,0') === 1 ? 1 : 0) + beaconBonus(S, b) : 0;
   const total = ctx.pts + aura + oc;
   S.influence += total;
   b.inf += ctx.pts;
@@ -237,6 +258,7 @@ function note(S, txt, k) {
 // Units per natural deposit; loose tokens are always 1.
 export const DEPOSIT_UNITS = { Ore: 3, Gold: 2, Ice: 3, Gas: 2, Crystal: 2, Loam: 3, Seam: 2, Wreck: 3, Regolith: 2, Anomaly: 2, Growth: 1 };
 function setRes(S, k, type, amt = 1) {
+  S.rver = (S.rver || 0) + 1;
   S.hexes[k].res = type;
   S.hexes[k].hid = false;
   S.hexes[k].amt = amt;
@@ -393,7 +415,7 @@ export function mkApi(S, ctx) {
           setRes(S, at, to);
         }
       }
-      if (at === k) { h.res = to; h.amt = 1; }
+      if (at === k) { h.res = to; h.amt = 1; S.rver = (S.rver || 0) + 1; }
       did();
       ctx.notes.push(`${RES[from].ic}→${RES[to].ic}`);
       if (from === 'Gold') { S.stats.precious++; bossHook(S, 'gold'); }
@@ -429,7 +451,7 @@ export function mkApi(S, ctx) {
       if (!h.res || h.hid) return null;
       const t = h.res;
       if (!all && (h.amt || 1) > 1) h.amt--;
-      else { h.res = null; h.amt = 1; }
+      else { h.res = null; h.amt = 1; S.rver = (S.rver || 0) + 1; }
       did();
       if (t === 'Ice' || t === 'Water') S.stats.water = (S.stats.water || 0) + 1;
       ctx.notes.push(`−${RES[t].ic}`);
@@ -441,6 +463,7 @@ export function mkApi(S, ctx) {
       if (!S.hexes[f].res || !isFree(S, t)) return false;
       S.hexes[t].res = S.hexes[f].res;
       S.hexes[f].res = null;
+      S.rver = (S.rver || 0) + 1;
       did();
       return true;
     },
@@ -451,6 +474,7 @@ export function mkApi(S, ctx) {
       if (h.kind !== 'rock') return false;
       h.kind = 'cavern';
       h.hid = false;
+      S.rver = (S.rver || 0) + 1;
       did();
       S.stats.excavated++;
       ctx.notes.push('⛏ cavern');
@@ -462,6 +486,7 @@ export function mkApi(S, ctx) {
       const h = S.hexes[k];
       if (!h.hid || !h.res) return null;
       h.hid = false;
+      S.rver = (S.rver || 0) + 1;
       did();
       emit(S, { type: 'reveal', k, res: h.res, src });
       return h.res;
@@ -743,7 +768,7 @@ export function playCard(S, handIdx, k) {
   const c = CARDS[cid];
   const h = S.hexes[k];
   if (h.res && !h.hid) { S.stripLeft--; note(S, `🛰️ Built over ${h.res} (${S.stripLeft} left)`, k); }
-  if (h.res) { h.res = null; h.hid = false; }
+  if (h.res) { h.res = null; h.hid = false; S.rver = (S.rver || 0) + 1; }
   const id = S.nextId++;
   const b = { id, c: cid, k, clan: c.cl, acts: 0, age: 0, sun: 0, mem: {}, placed: S.turn, inf: 0, dis: 0 };
   S.blds[id] = b;
@@ -775,6 +800,7 @@ export function digTurn(S, k) {
   S._q = [];
   h.kind = 'cavern';
   h.hid = false;
+  S.rver = (S.rver || 0) + 1;
   S.stats.excavated++;
   note(S, '⛏ Excavated a Cavern', k);
   emit(S, { type: 'excavate', k, src: null });
@@ -974,7 +1000,7 @@ export const MEGA = {
   biosphere: { n: 'Deep Biosphere', ic: '🌳', req: '4 connected Bio buildings, 2 of them on Pressurized or Cavern hexes', d: '+4 Influence every turn.' },
   tradering: { n: 'Orbital Trade Ring', ic: '💫', req: '3 Orbit/Orbital buildings and at least one Cargo launch', d: 'Every third Cargo launch scores +10.' },
   processor: { n: 'Planetary Processor', ic: '🏭', req: '3 connected Mining/Industry/Metal buildings and 2 Alloy created', d: 'Every third Alloy created scores +8.' },
-  nexus: { n: 'Civilization Nexus', ic: '🏛️', req: 'Connected buildings on Pressurized hexes from every active clan (2+ clans)', d: '+2 Influence per active clan every turn; the first Integrity loss each era is prevented.' },
+  nexus: { n: 'Civilization Nexus', ic: '🏛️', req: '2 connected buildings on Pressurized hexes from every active clan (2+ clans)', d: 'A living council: +1 Influence per seat every turn, one seat per Pressurized building in the network (max 2 per clan) – lose a building, lose its seat. The first Integrity loss each era is prevented.' },
   reactor: { n: 'Exotic Reactor', ic: '☢️', req: '3 Exotic/Radiation/Crystal buildings next to an Anomaly', d: 'Each turn one of them activates again (+3); it may irradiate a hex.' },
 };
 function megaScore(S, id, n) {
@@ -1002,7 +1028,8 @@ export function megaProgress(S) {
     biosphere: { have: best((c) => { const bio = tagged(c, 'Bio'); return Math.min(4, bio.length) + Math.min(2, bio.filter((b) => S.hexes[b.k].st.Pressure || S.hexes[b.k].kind === 'cavern').length); }), need: 6 },
     tradering: { have: Math.min(3, bldList(S).filter((b) => S.hexes[b.k].kind === 'orbit' || hasTag(b, 'Orbit') || hasTag(b, 'Orbital')).length) + Math.min(1, S.stats.launched), need: 4 },
     processor: { have: best((c) => Math.min(3, tagged(c, 'Mining', 'Industry', 'Metal').length)) + Math.min(2, S.stats.alloy), need: 5 },
-    nexus: { have: S.clans.length < 2 ? 0 : best((c) => new Set(c.filter((b) => S.hexes[b.k].st.Pressure).map((b) => b.clan)).size), need: S.clans.length < 2 ? 99 : S.clans.length },
+    // Council seats: each active clan holds up to 2, one per Pressurized building in the network.
+    nexus: { have: S.clans.length < 2 ? 0 : best((c) => S.clans.reduce((s, cl) => s + Math.min(2, c.filter((b) => b.clan === cl && S.hexes[b.k].st.Pressure).length), 0)), need: S.clans.length < 2 ? 99 : 2 * S.clans.length },
     reactor: { have: Math.min(3, nextAnom.length), need: 3, blds: nextAnom },
   };
 }
@@ -1017,7 +1044,7 @@ function megaStep(S) {
   }
   if (S.mega.dawn && pr.dawn.net) S.megaNet = { dawn: pr.dawn.net.map((b) => b.id) };
   if (S.mega.biosphere) megaScore(S, 'biosphere', 4);
-  if (S.mega.nexus) megaScore(S, 'nexus', 2 * S.clans.length);
+  if (S.mega.nexus && pr.nexus.have) megaScore(S, 'nexus', pr.nexus.have);
   if (S.mega.reactor && pr.reactor.blds.length) {
     const b = pr.reactor.blds[rint(S, pr.reactor.blds.length)];
     if (activate(S, b, null, { repeat: true, extra: true, fn: card(b).run || card(b).build })) megaScore(S, 'reactor', 3);

@@ -16,11 +16,12 @@ export const STARTERS = {
   wreck: 'breaker_yard', kep: 'launch_rail', hearth: 'pressure_dome', umbra: 'void_prism',
 };
 
-// Influence checkpoint curve (cumulative): need(t) = diff × (0.7t² + 1.5t).
+// Influence checkpoint curve (cumulative): need(t) = diff × (0.9t² + 1.95t).
 // Fitted to the greedy bot's 10th-percentile Influence in tools/sim.mjs
-// (≈29 / 99 / 210 / 335 at turns 5/10/15/20), so a solid player clears an
-// ordinary sector-1 colony ~90% of the time; later sectors raise `diff`.
-export const checkpointNeed = (t, diff) => Math.round(diff * (0.7 * t * t + 1.5 * t));
+// (≈37 / 141 / 292 / 468 at turns 5/10/15/20, Beacon bonus included), so a
+// solid player clears an ordinary sector-1 colony ~90% of the time; later
+// sectors raise `diff`.
+export const checkpointNeed = (t, diff) => Math.round(diff * (0.9 * t * t + 1.95 * t));
 export function checkpointsFor(turns, diff) {
   const out = [];
   for (let t = 5; t <= turns; t += 5) out.push({ turn: t, need: checkpointNeed(t, diff), met: null });

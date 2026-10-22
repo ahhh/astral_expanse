@@ -41,7 +41,7 @@ PP = OnBuild
 ## 3. Results
 
 - Bot win rate on an ordinary sector-1 colony: **97%**; final Influence median **583**.
-- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t) → T5: 32, T10: 110, T15: 232, T20: 399 on sector 1. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).
+- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t); each checkpoint asks for the increment since the previous one (×0.9 after the first) → T5: 32, T10: 70, T15: 110, T21: 185 on a sector-1 21-turn map. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).
 
 ### Clan balance
 

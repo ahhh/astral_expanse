@@ -56,7 +56,7 @@ Each colony is a hex asteroid that you build up one card per turn.
 2. **Chain reactions are the point.** Buildings fire On Build, on timers, while Sunlit, or in reaction to nearby events: a resource being created, consumed or melted, a hex heating up, a meteor landing, and so on. One well-placed card can set off a whole district. Each building activates at most twice per turn.
 3. **Spend a turn on the land.** Instead of building, tap a Rock hex next to open ground and **⛏ Excavate** it into a Cavern, or tap one of your buildings and **💥 Demolish** it to free the hex. Either uses your turn, triggers nearby reactions (excavate or destroy listeners) and you still draw normally.
 4. **Mind the light.** The asteroid turns a quarter each turn (see the sun compass). Solar buildings want Sunlit hexes and Cryo buildings want Shadow.
-5. **Hit the checkpoints.** Every 5 turns you must reach an Influence target. Missing one costs 3 Integrity, and missing the final one fails the colony. Each checkpoint you meet (except the last) offers a **🔬 local technology** for the rest of that map, for example Overclock, Shield Grid or Supply Drones.
+5. **Hit the checkpoints.** Every 5 turns, and on the final turn, you must earn an Influence target. Each checkpoint counts only Influence earned since the previous one, so a miss never leaves you behind on the next; your total still counts toward Masterwork and the expedition score. Missing one costs 3 Integrity, and missing the final one fails the colony. Each checkpoint you meet (except the last) offers a **🔬 local technology** for the rest of that map, for example Overclock, Shield Grid or Supply Drones.
 6. **Go for mega-projects.** **🎯 Goals** tracks six arrangements, such as *Artificial Dawn* (Solar + Power network) and *Deep Biosphere* (connected Bio buildings on Pressurized ground). Completing one scores +12 and grants a lasting perk.
 7. **Draws.** You draw 1 card per turn, +1 if two of your clans activated last turn (or your only clan did), and +1 more if all three did.
 
@@ -83,7 +83,7 @@ From Frontier Pressure 4 onwards, **route crises** are forecast one jump ahead: 
 
 ### 6. Spend world resources between colonies
 
-- **Clans:** see your treaty slots. Raise a clan's *Presence* so more of your draws come from it, *Favor* or *Ban* individual cards, research Mid/Advanced tiers earlier, and buy **Clan Enhancements**: two levels per clan, each a visible head start on every map, such as a Bio-Loam patch or an extra starter card.
+- **Clans:** see your treaty slots. Raise a clan's *Presence* so more of your draws come from it, *Favor* or *Ban* individual cards (you get one free Favor and one free Ban at the start and after every planet; up to 8 bans, 3 per clan), research Mid/Advanced tiers earlier, and buy **Clan Enhancements**: two levels per clan, each a visible head start on every map, such as a Bio-Loam patch or an extra starter card.
 - **Foundry:** 18 shop-only blueprints, two per clan. Buying one adds it to that clan's draw pool. Offers refresh in each new sector, or for 2 CR at a Freeport.
 - **Fleet:** up to two one-shot **Preparations** for the next colony (deep scans, ice pods, insurance, an emergency shuttle and more). The **Fleet Yard** sells permanent upgrades: Survey Mast, Cargo Keel, Cold-Chain Engine, Mobile Embassy, a third Preparation slot and a Rescue Tug.
 - **Goals:** carry one **sector contract** at a time, such as *Cryogenic Corridor* or *Veil Cartography*, for bonus rewards. The tab also tracks your Veil checklist and the log.

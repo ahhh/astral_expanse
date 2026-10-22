@@ -149,7 +149,7 @@ function nodeSheet(E, n, edge, hooks) {
     }
     if (n.type === 'boss') {
       const B = X.BOSSES[n.boss];
-      b.append(h('h4', null, B.s), h('p', null, B.d), h('p', { class: 'dim' }, `25 turns, a large map, and a required stabilization objective. See the Goals tab for the Veil checklist.`));
+      b.append(h('h4', null, B.s), h('p', null, B.d), h('p', { class: 'dim' }, `26 turns, a large map, and a required stabilization objective. See the Goals tab for the Veil checklist.`));
     }
     if (n.profile) b.append(h('div', { class: 'sect' }, 'Resource profile'), profileEl(n.profile));
   }
@@ -329,6 +329,8 @@ function network(body, E, hooks) {
 function directorate(body, E, hooks) {
   const act = (fn) => () => { if (fn()) hooks.refresh(); else toast('Cannot afford that'); };
   body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, `Your treaty holds up to ${X.maxClans(E)} active clans. You start with one; secure Clan Enclaves to bring more in. Each draw picks an active clan by Presence weight, then a card by rarity × Favor weight (Common 1, Uncommon 0.6, Rare 0.3).`));
+  const tk = X.dirTokens(E);
+  body.append(h('div', { class: 'item row wrap' }, h('b', null, 'Free picks:'), h('span', { class: 'chip' + (tk.fav ? ' good' : '') }, `⭐ ${tk.fav} Favor`), h('span', { class: 'chip' + (tk.ban ? ' good' : '') }, `🚫 ${tk.ban} Ban`), h('span', { class: 'faint', style: { fontSize: '12px' } }, '+1 of each after every planet. Spent before Credits.')));
   const slots = h('div', { class: 'row wrap', style: { marginBottom: '8px' } }, E.clans.map((c) => clanChip(c, ' ✓')));
   for (let i = E.clans.length; i < X.maxClans(E); i++) slots.append(h('span', { class: 'chip faint' }, '◌ empty slot'));
   body.append(slots);
@@ -355,8 +357,8 @@ function directorate(body, E, hooks) {
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
             h('span', { class: 'pp pill-' + c.r }, rubric(c).pp + ' PP'),
             banned ? h('button', { class: 'btn small', disabled: !X.canAfford(E, X.DIR_COST.restore), onclick: act(() => X.restore(E, c.id)) }, 'Restore')
-              : [fv < 3 ? h('button', { class: 'btn small', disabled: !X.canAfford(E, X.DIR_COST.fav[fv - 1]), onclick: act(() => X.favorUp(E, c.id)) }, `Favor ×${fv + 1}`) : h('span', { class: 'chip' }, 'Favored ×3'),
-                X.canBan(E, c.id) ? h('button', { class: 'btn small danger', disabled: !X.canAfford(E, X.DIR_COST.ban), onclick: act(() => X.ban(E, c.id)) }, 'Ban') : null]));
+              : [fv < 3 ? h('button', { class: 'btn small', disabled: !tk.fav && !X.canAfford(E, X.DIR_COST.fav[fv - 1]), onclick: act(() => X.favorUp(E, c.id)) }, `Favor ×${fv + 1}${tk.fav ? ' (free)' : ''}`) : h('span', { class: 'chip' }, 'Favored ×3'),
+                X.canBan(E, c.id) ? h('button', { class: 'btn small danger', disabled: !tk.ban && !X.canAfford(E, X.DIR_COST.ban), onclick: act(() => X.ban(E, c.id)) }, `Ban${tk.ban ? ' (free)' : ''}`) : null]));
       })));
     body.append(h('div', { class: 'item', style: { borderColor: active ? CLANS[cl].col : 'var(--line)' } },
       h('div', { class: 'row' }, h('h4', { class: 'grow', style: { color: CLANS[cl].col } }, `${CLANS[cl].ic} ${CLANS[cl].n}`), h('span', { class: 'chip' }, active ? 'Active' : 'Bench')),
@@ -368,7 +370,7 @@ function directorate(body, E, hooks) {
         ec ? costBtn(E, `Enhance → ${X.ENHANCE[cl][elv].n}`, ec, act(() => X.enhance(E, cl))) : null),
       details));
   }
-  body.append(h('p', { class: 'faint' }, `Bans: ${E.dir.ban.length}/4 (max 2 per clan, starters cannot be banned). Enhancements apply on every map while the clan is active.`));
+  body.append(h('p', { class: 'faint' }, `Bans: ${E.dir.ban.length}/${X.MAX_BANS} (max ${X.MAX_CLAN_BANS} per clan, starters cannot be banned). Enhancements apply on every map while the clan is active.`));
 }
 
 // ---------------------------------------------------------------- foundry

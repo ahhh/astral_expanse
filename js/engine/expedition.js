@@ -192,7 +192,7 @@ export function newExpedition(seed, clans, opts = {}) {
   const E = {
     v: 2, seed, clans: clans.slice(), licensed: clans.slice(), contacts: [],
     difficulty, mods,
-    dir: { presence: {}, fav: {}, ban: [], research: 0, extra: {} },
+    dir: { presence: {}, fav: {}, ban: [], research: 0, extra: {}, tokens: { fav: 1, ban: 1 } },
     enh: {},
     res: Object.assign(purse, { GS: 0 }),
     pressure: 0, maxPressure: D.pressure - (mods.includes('tight') ? 2 : 0),
@@ -291,7 +291,7 @@ export function missionPreview(E, n) {
   }
   diff *= D.mult;
   const R = n.type === 'boss' ? 5 : n.type === 'relay' ? 3 : 4;
-  const turns = n.type === 'boss' ? 25 : n.type === 'relay' ? 15 : 20;
+  const turns = n.type === 'boss' ? 26 : n.type === 'relay' ? 16 : 21;
   return { diff, R, turns, sec };
 }
 
@@ -829,6 +829,10 @@ export function resolveMission(E, charterFam) {
     return out;
   }
   const guest = E.mission.guest;
+  const tk = dirTokens(E);
+  tk.fav++;
+  tk.ban++;
+  log(E, 'Directorate: +1 free Favor and +1 free Ban.');
   if (S.status === 'won') {
     const opts = charterOptions(E);
     const ch = opts.find((c) => c.fam === charterFam) || opts[0];
@@ -897,9 +901,17 @@ export function presenceUp(E, cl) {
   log(E, `${CLANS[cl].n} presence raised to ${lv + 1}.`);
   return true;
 }
+export const MAX_BANS = 8, MAX_CLAN_BANS = 3;
+// One free Favor and one free Ban at the start, and another of each after every planet.
+export const dirTokens = (E) => (E.dir.tokens = E.dir.tokens || { fav: 1, ban: 1 });
+function spend(E, kind, cost) {
+  const t = dirTokens(E);
+  if (t[kind] > 0) { t[kind]--; return true; }
+  return pay(E, cost);
+}
 export function favorUp(E, cid) {
   const lv = E.dir.fav[cid] || 1;
-  if (lv >= 3 || !pay(E, DIR_COST.fav[lv - 1])) return false;
+  if (lv >= 3 || !spend(E, 'fav', DIR_COST.fav[lv - 1])) return false;
   E.dir.fav[cid] = lv + 1;
   log(E, `Favored ${CARDS[cid].n} (weight ${lv + 1}).`);
   return true;
@@ -907,12 +919,12 @@ export function favorUp(E, cid) {
 export function canBan(E, cid) {
   const c = CARDS[cid];
   if (E.dir.ban.includes(cid) || Object.values(STARTERS).includes(cid)) return false;
-  if (E.dir.ban.length >= 4) return false;
-  if (E.dir.ban.filter((x) => CARDS[x].cl === c.cl).length >= 2) return false;
+  if (E.dir.ban.length >= MAX_BANS) return false;
+  if (E.dir.ban.filter((x) => CARDS[x].cl === c.cl).length >= MAX_CLAN_BANS) return false;
   return true;
 }
 export function ban(E, cid) {
-  if (!canBan(E, cid) || !pay(E, DIR_COST.ban)) return false;
+  if (!canBan(E, cid) || !spend(E, 'ban', DIR_COST.ban)) return false;
   E.dir.ban.push(cid);
   delete E.dir.fav[cid];
   log(E, `Blacklisted ${CARDS[cid].n}.`);

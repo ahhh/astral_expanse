@@ -912,22 +912,10 @@ export function endTurn(S) {
   // 6. stamps that are evaluated each turn
   const clansNow = Object.keys(S.tstat.clans).filter((c) => S.clans.includes(c)).length;
   if (clansNow >= 3) S.stats.triTurns++;
-  // 7. checkpoint
-  const cp = S.checkpoints.find((c) => c.turn === S.turn);
-  if (cp) {
-    cp.at = S.influence;
-    cp.met = S.influence >= cp.need;
-    if (cp.met) {
-      note(S, `✅ Checkpoint ${cp.need} met`);
-      if (cp.turn < S.turns) offerTech(S);
-    }
-    else if (cp.turn === S.turns) note(S, `❌ Final checkpoint ${cp.need} missed`);
-    else { note(S, `⚠️ Checkpoint ${cp.need} missed`); loseIntegrity(S, 3, 'missed checkpoint'); }
-  }
   checkFail(S);
   if (S.status !== 'play') return;
-  if (S.turn >= S.turns) { finish(S); return; }
-  // 8. next turn & draws
+  if (S.turn >= S.turns) { checkpoint(S, S.turn); finish(S); return; }
+  // 7. next turn & draws
   S.lastClans = clansNow;
   const draws = drawsFor(S, clansNow) + S.bonusDraw + (hasTech(S, 'drone') ? 1 : 0) + ((S.tradeCharter || []).includes(S.turn + 1) ? 1 : 0);
   S.bonusDraw = 0;
@@ -935,6 +923,26 @@ export function endTurn(S) {
   resetTurnState(S);
   dealDraws(S, draws);
   S.lastDraw = draws;
+  // 8. checkpoint for the turn that just ended – after the draws, so hand-full scrap counts
+  checkpoint(S, S.turn - 1);
+  checkFail(S);
+}
+
+// Influence earned toward the current checkpoint. Saves from before segmented
+// checkpoints have no cpBase and keep their cumulative targets.
+export const cpGain = (S) => S.influence - (S.cpBase || 0);
+function checkpoint(S, turn) {
+  const cp = S.checkpoints.find((c) => c.turn === turn);
+  if (!cp) return;
+  cp.at = cpGain(S);
+  cp.met = cp.at >= cp.need;
+  if (S.cpBase != null && turn < S.turns) S.cpBase = S.influence;
+  if (cp.met) {
+    note(S, `✅ Checkpoint ${cp.need} met`);
+    if (turn < S.turns) offerTech(S);
+  }
+  else if (turn === S.turns) note(S, `❌ Final checkpoint ${cp.need} missed`);
+  else { note(S, `⚠️ Checkpoint ${cp.need} missed`); loseIntegrity(S, 3, 'missed checkpoint'); }
 }
 
 // 1 draw, +1 if two clans activated (or your only clan did), +1 more if all three did.
@@ -1071,6 +1079,8 @@ export function integrateDone(S) {
   return S.clans.every((c) => cl.has(c)) && network(S, beacon).length >= 2;
 }
 
+// Masterwork: total Influence 25% above the sum of every checkpoint target.
+export const masterworkNeed = (S) => Math.round(1.25 * (S.cpBase == null ? S.checkpoints.at(-1).need : S.checkpoints.reduce((s, c) => s + c.need, 0)));
 function finish(S) {
   const finalCp = S.checkpoints[S.checkpoints.length - 1];
   const ok = finalCp.met;
@@ -1081,7 +1091,7 @@ function finish(S) {
     success: ok && bossOk,
     reason: !ok ? `Final Influence checkpoint (${finalCp.need}) was not met.` : !bossOk ? 'The planet\'s stabilization objective was not completed.' : 'Colony secured!',
     integrate: integrateDone(S),
-    masterwork: S.influence >= Math.round(finalCp.need * 1.25),
+    masterwork: S.influence >= masterworkNeed(S),
   };
 }
 

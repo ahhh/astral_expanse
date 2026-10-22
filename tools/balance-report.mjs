@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CARD_LIST, CLANS, CLAN_IDS, RARITY, TIER } from '../js/engine/cards.js';
 import { rubric, BANDS, HORIZON } from '../js/engine/rubric.js';
-import { checkpointNeed } from '../js/engine/mapgen.js';
+import { checkpointsFor } from '../js/engine/mapgen.js';
 
 const sim = JSON.parse(readFileSync(process.argv[2] || 'docs/sim-results.json'));
 const obs = Object.fromEntries(sim.rows.map((r) => [r.id, r]));
@@ -57,7 +57,7 @@ L.push('## 3. Results');
 L.push('');
 const games = sim.games;
 L.push(`- Bot win rate on an ordinary sector-1 colony: **${Math.round((100 * sim.wins) / games)}%**; final Influence median **${sim.finals.slice().sort((a, b) => a - b)[Math.floor(games / 2)]}**.`);
-L.push(`- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t) → ${[5, 10, 15, 20].map((t) => `T${t}: ${checkpointNeed(t, 1)}`).join(', ')} on sector 1. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).`);
+L.push(`- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t); each checkpoint asks for the increment since the previous one (×0.9 after the first) → ${checkpointsFor(21, 1).map((c) => `T${c.turn}: ${c.need}`).join(', ')} on a sector-1 21-turn map. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).`);
 L.push('');
 L.push('### Clan balance');
 L.push('');

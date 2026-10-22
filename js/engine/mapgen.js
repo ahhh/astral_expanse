@@ -21,11 +21,18 @@ export const STARTERS = {
 // (≈37 / 141 / 292 / 468 at turns 5/10/15/20, Beacon bonus included), so a
 // solid player clears an ordinary sector-1 colony ~90% of the time; later
 // sectors raise `diff`.
+// Checkpoints fall every 5 turns plus the final turn. Each one asks only for the
+// Influence earned since the previous checkpoint (the curve's increment × LATE
+// after the first), so a miss never leaves you in the hole. Segment gains swing
+// more than running totals, so LATE < 1 still lands later checkpoints a bit
+// harder than the old cumulative ones (bot win rate ≈95% → ≈90%).
 export const checkpointNeed = (t, diff) => Math.round(diff * (0.9 * t * t + 1.95 * t));
+const LATE = 0.9;
 export function checkpointsFor(turns, diff) {
-  const out = [];
-  for (let t = 5; t <= turns; t += 5) out.push({ turn: t, need: checkpointNeed(t, diff), met: null });
-  return out;
+  const at = [];
+  for (let t = 5; t + 5 <= turns; t += 5) at.push(t);
+  at.push(turns);
+  return at.map((t, i) => ({ turn: t, need: Math.round((checkpointNeed(t, diff) - checkpointNeed(at[i - 1] || 0, diff)) * (i ? LATE : 1)), met: null }));
 }
 
 function eventDeck(profile, opts) {
@@ -43,7 +50,7 @@ function eventDeck(profile, opts) {
 
 export function genColony(opts) {
   const R = opts.R || 4;
-  const turns = opts.turns || 20;
+  const turns = opts.turns || 21;
   const profile = opts.profile;
   const rng = { seed: opts.seed >>> 0 || 1 };
   const shp = H.shape(R);
@@ -145,7 +152,7 @@ export function genColony(opts) {
     clans: opts.clans.slice(),
     pool: {}, draw: { presence: {}, fav: {}, ban: [], research: 0 },
     hand: [], bonusDraw: 0,
-    events: [], checkpoints: checkpointsFor(turns, opts.diff || 1),
+    events: [], checkpoints: checkpointsFor(turns, opts.diff || 1), cpBase: 0,
     stats: { precious: 0, alloy: 0, icewater: 0, biomass: 0, exotic: 0, habitat: 0, launched: 0, placed: 0, acts: 0, repeats: 0, destroyed: 0, excavated: 0, impacts: 0, cooled: 0, triTurns: 0 },
     feed: [], tstat: null, status: 'play', result: null, boss: null, techs: [], techOffer: null, mega: {},
     name: opts.name || 'Colony', profile, type: opts.type || 'prospect', prestamp: false,

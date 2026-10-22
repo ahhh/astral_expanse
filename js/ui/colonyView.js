@@ -7,7 +7,7 @@ import * as HX from '../engine/hex.js';
 import {
   isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, scrapCard, bldAt, bldList, network, links, beaconLinked, BEACON_BONUS,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
-  SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone,
+  SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone, cpGain, masterworkNeed,
 } from '../engine/colony.js';
 import { bestMove } from '../engine/ai.js';
 import { buildingTile, resourceTile, mapBackdrop, MAP_FALLBACK, isMissing, markMissing } from './art.js';
@@ -115,9 +115,9 @@ export function colonyScreen(root, S, hooks) {
 
   function drawHUD() {
     const cp = S.checkpoints.find((c) => c.met == null) || S.checkpoints[S.checkpoints.length - 1];
-    const prev = S.checkpoints.filter((c) => c.turn < cp.turn).slice(-1)[0];
-    const lo = prev ? prev.need : 0;
-    const pct = Math.max(0, Math.min(100, ((S.influence - lo) / Math.max(1, cp.need - lo)) * 100));
+    const got = cp.at ?? cpGain(S);
+    const done = cp.met ?? got >= cp.need;
+    const pct = Math.max(0, Math.min(100, (got / Math.max(1, cp.need)) * 100));
     const ev = upcoming()[0];
     const [pic, pname] = PHASES[S.phase];
     hud.innerHTML = '';
@@ -127,10 +127,10 @@ export function colonyScreen(root, S, hooks) {
         h('span', { class: 'chip', title: pname }, pic, ' ', pname),
         h('span', { class: 'chip' }, `T${S.turn}/${S.turns}`)),
       h('div', { class: 'l1' },
-        h('span', { class: 'inf' }, S.influence),
+        h('span', { class: 'inf', title: 'Total Influence' }, S.influence),
         h('div', { class: 'grow' },
-          h('div', { class: 'cp' }, `Checkpoint ${cp.need} by turn ${cp.turn}`, S.influence >= cp.need ? ' ✅' : ''),
-          h('div', { class: 'meter' + (S.turn >= cp.turn - 1 && S.influence < cp.need ? ' danger' : '') }, h('i', { style: { width: pct + '%' } }))),
+          h('div', { class: 'cp' }, `Checkpoint ${got}/${cp.need} by turn ${cp.turn}`, done ? ' ✅' : ''),
+          h('div', { class: 'meter' + (S.turn >= cp.turn - 1 && !done ? ' danger' : '') }, h('i', { style: { width: pct + '%' } }))),
         h('span', { class: 'chip', title: 'Asteroid Integrity' }, '❤️ ', S.integrity),
         ev ? h('button', { class: 'chip', onclick: goals }, EVENT_INFO[ev.type].ic, ` T${ev.turn}`) : null),
       h('div', { class: 'l1', style: { fontSize: '11px' } },
@@ -470,10 +470,10 @@ export function colonyScreen(root, S, hooks) {
     const lvl = h('b', null, before);
     const row = (lbl, val, cls = '') => h('div', { class: 'ts-row ' + cls }, h('span', null, lbl), val);
     const tail = h('div', { class: 'ts-tail', hidden: steps.length > 0 },
-      cpHit ? row(`Checkpoint · turn ${cpHit.turn}`, h('b', { class: cpHit.met ? 'good' : 'bad' }, `${cpHit.need} ${cpHit.met ? '✅ met' : '❌ missed'}`)) : null,
+      cpHit ? row(`Checkpoint · turn ${cpHit.turn}`, h('b', { class: cpHit.met ? 'good' : 'bad' }, `${cpHit.at}/${cpHit.need} ${cpHit.met ? '✅ met' : '❌ missed'}`)) : null,
       next ? [
-        row(`Target · by turn ${next.turn}`, h('b', null, next.need), 'ts-target'),
-        row('Still needed', h('b', { class: S.influence >= next.need ? 'good' : '' }, S.influence >= next.need ? 'On track ✅' : `+${next.need - S.influence}`)),
+        row(`Target · by turn ${next.turn}`, h('b', null, `${cpGain(S)}/${next.need}`), 'ts-target'),
+        row('Still needed', h('b', { class: cpGain(S) >= next.need ? 'good' : '' }, cpGain(S) >= next.need ? 'On track ✅' : `+${next.need - cpGain(S)}`)),
         row('Turns left for this target', h('b', null, next.turn - turn)),
       ] : null,
       S.checkpoints.length > 1 && next ? row('Checkpoint', h('b', null, `${S.checkpoints.indexOf(next) + 1} of ${S.checkpoints.length}`)) : null,
@@ -658,9 +658,11 @@ export function colonyScreen(root, S, hooks) {
   function goals() {
     const body = h('div', null);
     body.append(h('div', { class: 'sect' }, 'Influence checkpoints'));
-    for (const c of S.checkpoints) {
-      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (c.met ? ' y' : '') }, c.met ? '✓' : c.met === false ? '✗' : c.turn), `Turn ${c.turn}: ${c.need} Influence`, c.turn === S.turns ? h('span', { class: 'faint' }, ' (final – must meet)') : h('span', { class: 'faint' }, ' (miss: −3 Integrity)')));
-    }
+    body.append(h('p', { class: 'faint', style: { fontSize: '12px', margin: '0 0 6px' } }, S.cpBase == null ? 'Total Influence needed by each turn.' : 'Each checkpoint counts only the Influence earned since the previous one.'));
+    S.checkpoints.forEach((c, i) => {
+      const from = S.cpBase == null ? 1 : (S.checkpoints[i - 1]?.turn ?? 0) + 1;
+      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (c.met ? ' y' : '') }, c.met ? '✓' : c.met === false ? '✗' : c.turn), `Turns ${from}–${c.turn}: ${c.at != null ? c.at + '/' : ''}${c.need} Influence`, c.turn === S.turns ? h('span', { class: 'faint' }, ' (final – must meet)') : h('span', { class: 'faint' }, ' (miss: −3 Integrity)')));
+    });
     if (S.boss) {
       const o = bossObjective(S);
       body.append(h('div', { class: 'sect' }, 'Stabilization objective (required)'), h('div', { class: 'stamp' }, h('span', { class: 'ok' + (o.done ? ' y' : '') }, o.done ? '✓' : '…'), o.text));
@@ -673,8 +675,8 @@ export function colonyScreen(root, S, hooks) {
         const prog = f === 'trade' ? `${S.stats.launched}/3 launches · ${S.stats.habitat}/10 habitat acts` : `${S.stats[sp.stat]}/${sp.need}`;
         body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (done ? ' y' : '') }, done ? '✓' : (FAMILY_INFO[f] || { ic: '💳' }).ic), `Specialize (${f === 'trade' ? 'Trade' : FAMILY_INFO[f].n}): ${sp.text}`, h('span', { class: 'faint' }, ` ${prog}`)));
       }
-      const fin = S.checkpoints[S.checkpoints.length - 1].need;
-      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (S.influence >= fin * 1.25 ? ' y' : '') }, '★'), `Masterwork: finish with ${Math.round(fin * 1.25)} Influence (+1 route charge)`));
+      const mw = masterworkNeed(S);
+      body.append(h('div', { class: 'stamp' }, h('span', { class: 'ok' + (S.influence >= mw ? ' y' : '') }, '★'), `Masterwork: finish with ${mw} total Influence (+1 route charge)`));
     }
     const mp = megaProgress(S);
     body.append(h('div', { class: 'sect' }, 'Mega-projects (+12, then a lasting perk)'));

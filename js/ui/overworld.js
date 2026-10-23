@@ -7,10 +7,11 @@ import { rubric } from '../engine/rubric.js';
 import * as X from '../engine/expedition.js';
 import { planetIcon, isMissing, markMissing } from './art.js';
 
-const RES_ORDER = ['CR', 'AL', 'CY', 'GE', 'DA', 'GS'];
+const RES_ORDER = ['MK', 'CR', 'AL', 'CY', 'GE', 'DA', 'GS'];
 const TABS = [['chart', '🗺️', 'Chart'], ['net', '🛰️', 'Network'], ['dir', '🏛️', 'Clans'], ['foundry', '🔧', 'Foundry'], ['fleet', '🚀', 'Fleet'], ['goals', '🎯', 'Goals']];
 
 const RES_TIPS = {
+  MK: 'The common currency. Buy or sell any other resource on the Network tab\'s Exchange. Earned after every colony (3 per Integrity left), from network dividends and by selling.',
   CR: 'Pays for Foundry, clan politics, lanes and trade. Earned from Mint and Trade colonies, Derelicts and selling at Freeports.',
   AL: 'Builds supply lanes, fleet upgrades and rescues. Earned from Foundry Works colonies, Derelicts and Freeport trade.',
   CY: 'Jump fuel. Running short means a tow (+Pressure). Earned from Cryogenic Depot colonies and Freeport trade.',
@@ -19,7 +20,7 @@ const RES_TIPS = {
   GS: 'Bring 3 to the Veil; each one missing makes the final world harder. Earned by securing Gate Shrines.',
 };
 export function resBar(E) {
-  return h('div', { class: 'res' }, RES_ORDER.map((r) => withTip(
+  return h('div', { class: 'res', 'data-tut': 'res' }, RES_ORDER.map((r) => withTip(
     h('span', { class: 'chip', 'aria-label': WORLD[r].n }, WORLD[r].ic, ' ', E.res[r], ' ', h('span', { class: 'faint' }, r)),
     [h('b', null, `${WORLD[r].ic} ${WORLD[r].n}`), RES_TIPS[r]])));
 }
@@ -46,14 +47,14 @@ export function overworldScreen(root, E, hooks, tab = 'chart') {
       h('span', { class: 'chip', title: 'Active clans' }, E.clans.map((c) => CLANS[c].ic).join(''), ` ${E.clans.length}/${X.maxClans(E)}`),
       h('button', { class: 'chip', onclick: () => hooks.menu() }, '☰')),
     resBar(E),
-    h('div', { class: 'row', style: { marginTop: '6px', fontSize: '12px' } },
+    h('div', { class: 'row', style: { marginTop: '6px', fontSize: '12px' }, 'data-tut': 'pressure' },
       h('span', { class: 'dim' }, 'Frontier Pressure'),
       h('div', { class: 'meter grow' + (press > 0.7 ? ' danger' : '') }, h('i', { style: { width: Math.min(100, press * 100) + '%' } })),
       h('b', null, `${E.pressure}/${E.maxPressure}`)));
   const body = h('div', { class: tab === 'chart' ? 'chartwrap' : 'page' });
   const badge = { net: X.openCrises(E).length || E.pendingCompact ? '•' : '', goals: !E.contract && E.contractOffers.length ? '•' : '' };
   const tabs = h('div', { class: 'tabs' }, TABS.map(([id, ic, n]) =>
-    h('button', { class: tab === id ? 'on' : '', onclick: () => hooks.tab(id) }, h('span', null, ic), n + (badge[id] ? ' •' : ''))));
+    h('button', { class: tab === id ? 'on' : '', 'data-tut': 'tab-' + id, onclick: () => hooks.tab(id) }, h('span', null, ic), n + (badge[id] ? ' •' : ''))));
   root.append(top, body, tabs);
   ({ chart, net: network, dir: directorate, foundry, fleet, goals })[tab](body, E, hooks);
   if (E.pendingCompact) setTimeout(() => compactSheet(E, hooks), 50);
@@ -102,7 +103,7 @@ function chart(body, E, hooks) {
     const cls = 'node-ring' + (reach.has(n.id) ? ' reach' : '') + (n.state === 'claimed' ? ' claimed' : '') + (n.state === 'stranded' ? ' stranded' : '') + (n.id === E.at ? ' here' : '') + (known ? '' : ' unknown');
     const nm = known ? n.name : 'Unsurveyed';
     const r = n.type === 'boss' ? 21 : 17;
-    const g = s('g', { class: 'node-c', onclick: () => nodeSheet(E, n, reach.get(n.id), hooks) },
+    const g = s('g', { class: 'node-c', 'data-tut': n.id === E.at ? 'here' : reach.has(n.id) ? 'reach' : null, onclick: () => nodeSheet(E, n, reach.get(n.id), hooks) },
       s('circle', { cx: x, cy: y, r, class: cls }),
       s('text', { x, y: y + r + 14, 'text-anchor': 'middle', class: 'node-name' }, nm.length > 12 ? nm.slice(0, 11) + '…' : nm));
     const emoji = () => s('text', { x, y: y + 6, 'text-anchor': 'middle', 'font-size': n.type === 'boss' ? 19 : 16, 'pointer-events': 'none' }, nodeEmoji(E, n));
@@ -127,7 +128,7 @@ function chart(body, E, hooks) {
   });
   const here = X.node(E, E.at);
   if (X.atHub(E)) {
-    body.append(h('div', { style: { position: 'sticky', bottom: '8px', padding: '0 12px' } }, h('button', { class: 'btn block primary', onclick: () => freeportSheet(E, hooks) }, here.type === 'ark' ? '🚀 Arkship services: exchange & treaty' : '⚓ Freeport services: exchange, treaty & Foundry')));
+    body.append(h('div', { style: { position: 'sticky', bottom: '8px', padding: '0 12px' } }, h('button', { class: 'btn block primary', onclick: () => freeportSheet(E, hooks) }, here.type === 'ark' ? '🚀 Arkship services: treaty' : '⚓ Freeport services: treaty & Foundry')));
   }
   if (!reach.size && E.status === 'active' && !E.colony) {
     body.append(h('p', { class: 'warn', style: { padding: '0 12px' } }, 'No onward lanes from here. Use the menu to end the expedition.'));
@@ -152,6 +153,10 @@ function nodeSheet(E, n, edge, hooks) {
       b.append(h('h4', null, B.s), h('p', null, B.d), h('p', { class: 'dim' }, `26 turns, a large map, and a required stabilization objective. See the Goals tab for the Veil checklist.`));
     }
     if (n.profile) b.append(h('div', { class: 'sect' }, 'Resource profile'), profileEl(n.profile));
+    if (n.type !== 'boss') {
+      const tr = X.nodeTrade(E, n);
+      b.append(h('p', { class: 'faint', style: { fontSize: '12px' } }, `🤝 Trade rating ${tr}${n.post ? ` (Trade Post ${n.post})` : ''}: ${tr ? `adds ${tr} Trade Strength while it is ${n.type === 'freeport' ? 'docked' : 'claimed'} and supplied` : 'adds no Trade Strength unless you open a Trade Post'}${n.type === 'freeport' || n.type === 'ark' ? '' : ' (a Free Trade Enclave charter adds +2)'}.`));
+    }
   }
   const actions = [];
   if (n.state !== 'unvisited') {
@@ -166,6 +171,8 @@ function nodeSheet(E, n, edge, hooks) {
     if (X.isNetNode(n)) {
       const lanes = E.lanes.filter((l) => l.a === n.id || l.b === n.id);
       if (lanes.length) b.append(h('div', { class: 'sect' }, 'Lanes'), ...lanes.map((l) => h('div', { class: 'faint', style: { fontSize: '12px' } }, `${X.LANE_CLASS[l.cls].n} to ${X.node(E, l.a === n.id ? l.b : l.a).name} · cap ${X.laneCap(E, l)}`)));
+      const pc = n.type !== 'boss' && X.postCost(E, n);
+      if (pc) actions.push({ label: `🏪 ${n.post ? 'Expand' : 'Open'} Trade Post (${X.costText(pc)})`, disabled: !X.canAfford(E, pc) || !!E.colony, on: () => { X.buildPost(E, n.id); hooks.refresh(); } });
       const opts = X.laneOptions(E, n.id).slice(0, 4);
       for (const o of opts) actions.push({ label: `Lane → ${X.node(E, o.to).name} (${X.costText(o.cost)})`, disabled: !X.canAfford(E, o.cost), on: () => { X.buildLane(E, n.id, o.to); hooks.refresh(); } });
     }
@@ -244,8 +251,8 @@ function compactSheet(E, hooks) {
 function freeportSheet(E, hooks) {
   const b = h('div', null);
   const again = () => { closeSheets(); hooks.refresh(); freeportSheet(E, hooks); };
-  b.append(h('div', { class: 'sect' }, 'Exchange'));
-  b.append(h('div', { class: 'list' }, X.exchangeRates(E).map((x) => h('button', { class: 'btn block', disabled: !X.canAfford(E, x.give), onclick: () => { X.exchange(E, x.id); again(); } }, x.d))));
+  b.append(h('div', { class: 'sect' }, 'Exchange'), h('p', { class: 'dim', style: { marginTop: 0 } }, 'While docked here your Exchange spreads are 4% tighter.'),
+    h('button', { class: 'btn block', onclick: () => { closeSheets(); hooks.tab('net'); } }, '💠 Open the Exchange'));
   b.append(treatyEl(E, again));
   b.append(h('div', { class: 'sect' }, 'Card Foundry'), h('button', { class: 'btn block', disabled: !X.canAfford(E, { CR: 2 }), onclick: () => { X.refreshFoundry(E); again(); toast('Foundry offers refreshed'); } }, 'Refresh the Foundry offers (2 CR)'));
   sheet({ title: 'Services', body: b });
@@ -268,12 +275,73 @@ function treatyEl(E, again) {
   return b;
 }
 
+// ---------------------------------------------------------------- exchange
+// Marks market: Trade Strength, the news wire and one ticker row per commodity.
+let qty = 1;
+const GRADE_CLS = { great: 'good', good: 'good', fair: '', poor: 'warn', bad: 'bad' };
+const GRADE_TXT = { great: 'Great', good: 'Good', fair: 'Fair', poor: 'Poor', bad: 'Bad' };
+function sparkline(vals) {
+  const W = 64, H = 22;
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const pts = vals.map((v, i) => [vals.length > 1 ? (i / (vals.length - 1)) * (W - 4) + 2 : W / 2, hi > lo ? H - 3 - ((v - lo) / (hi - lo)) * (H - 6) : H / 2]);
+  const [lx, ly] = pts.at(-1);
+  return s('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true' },
+    s('polyline', { points: pts.map((p) => p.join(',')).join(' '), fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }),
+    s('circle', { cx: lx, cy: ly, r: 2.2, fill: 'currentColor' }));
+}
+function exchangeEl(E, hooks) {
+  const wrap = h('div', null);
+  const ts = X.tradeStrength(E);
+  const sp = X.spread(E);
+  const div = X.dividend(E);
+  const prevAt = ts.next ? X.TRADE_TIERS.filter(([at]) => at <= ts.total).at(-1)[0] : 0;
+  wrap.append(h('div', { class: 'item', 'data-tut': 'trade-strength' },
+    h('div', { class: 'row' }, h('h4', { class: 'grow' }, `🤝 Trade Strength ${ts.total}`), h('span', { class: 'chip good' }, ts.tier)),
+    ts.next ? h('div', { class: 'row', style: { fontSize: '12px', margin: '4px 0' } }, h('div', { class: 'meter grow' }, h('i', { style: { width: ((ts.total - prevAt) / (ts.next[0] - prevAt)) * 100 + '%' } })), h('span', { class: 'faint' }, `${ts.next[0] - ts.total} to ${ts.next[1]}`)) : null,
+    h('div', { class: 'dim', style: { fontSize: '12px' } }, `You buy ${Math.round(sp * 100)}% above and sell ${Math.round(sp * 100)}% below the market price${X.atHub(E) ? ' (docked: 4% tighter)' : ''}. Network dividend: ${div ? `+${div} 💠 per jump` : 'none yet (1 💠 per jump per 3 strength)'}. Each colony pays ${X.MARKS_PER_INTEGRITY} 💠 per Integrity left.`),
+    h('details', null, h('summary', { class: 'faint', style: { cursor: 'pointer', fontSize: '12px', marginTop: '4px' } }, 'What builds Trade Strength'),
+      h('div', { class: 'faint', style: { fontSize: '12px' } }, ts.parts.map((p) => h('div', null, `+${p.v} ${p.n}`))),
+      h('p', { class: 'dim', style: { fontSize: '12px', margin: '6px 0 0' } }, 'Supplied network nodes: the Arkship, Freeports and Relay Rocks +2; most colonies +1; Fault Worlds and Gate Shrines 0. A Free Trade Enclave charter adds +2. Trade Posts add +1 per level on any node (tap it on the chart or below). The Fleet Yard sells a Market Uplink (+2) and a Brokers\' Guild Charter (+3). Every Trade Compact adds +1.'))));
+
+  const news = E.market.news;
+  wrap.append(h('div', { class: 'item', 'data-tut': 'wire' }, h('h4', null, '📰 Market wire'),
+    news.length ? news.map((n) => h('div', { style: { fontSize: '12px' } }, h('b', { class: n.dir > 0 ? 'good' : 'bad' }, `${WORLD[n.r].ic} ${n.r} ${n.dir > 0 ? '▲ rising' : '▼ falling'}`), ` for the next ${n.left === 1 ? 'jump' : `${n.left} jumps`} – ${n.n}.`))
+      : h('div', { class: 'dim', style: { fontSize: '12px' } }, 'Quiet lanes. News that moves prices is announced here a jump before it hits.')));
+
+  wrap.append(h('div', { class: 'row', style: { margin: '10px 0 6px' } }, h('span', { class: 'dim grow', style: { fontSize: '12px' } }, `Prices move on every jump. You hold ${E.res.MK} 💠`),
+    h('div', { class: 'seg' }, [1, 3, 5].map((q) => h('button', { class: 'btn small' + (qty === q ? ' on' : ''), onclick: () => { qty = q; hooks.refresh(); } }, `×${q}`)))));
+  const act = (fn, msg) => () => { if (fn()) { hooks.refresh(); } else toast(msg); };
+  wrap.append(h('div', { class: 'list', 'data-tut': 'market' }, X.COMMODITIES.map((r) => {
+    const a = X.priceAdvice(E, r);
+    const price = E.market.price[r];
+    let bq = qty;
+    while (bq > 1 && X.quote(E, r, bq, 'buy') > E.res.MK) bq--;
+    const sq = Math.max(1, Math.min(qty, E.res[r]));
+    const bCost = X.quote(E, r, bq, 'buy'), sGain = X.quote(E, r, sq, 'sell');
+    const chg = Math.round(a.change * 100);
+    return h('div', { class: 'item ticker', 'data-tut': 'ticker-' + r },
+      h('div', { class: 'row' },
+        h('div', { class: 'grow' }, h('b', null, `${WORLD[r].ic} ${WORLD[r].n}`), h('div', { class: 'faint', style: { fontSize: '11px' } }, `You have ${E.res[r]} ${r} · fair ≈${Math.round(a.fair)} 💠`)),
+        h('span', { class: chg > 0 ? 'good' : chg < 0 ? 'bad' : 'dim' }, sparkline(E.market.hist[r])),
+        h('div', { style: { textAlign: 'right', minWidth: '56px' } }, h('b', { class: 'pp' }, `${price.toFixed(1)} 💠`), h('div', { class: chg > 0 ? 'good' : chg < 0 ? 'bad' : 'faint', style: { fontSize: '11px' } }, chg ? `${chg > 0 ? '▲' : '▼'} ${Math.abs(chg)}%` : '–'))),
+      h('div', { class: 'row wrap', style: { margin: '6px 0', fontSize: '12px' } },
+        h('span', { class: 'chip ' + GRADE_CLS[a.sell] }, `Sell: ${GRADE_TXT[a.sell]}`),
+        h('span', { class: 'chip ' + GRADE_CLS[a.buy] }, `Buy: ${GRADE_TXT[a.buy]}`),
+        a.news ? h('span', { class: 'chip ' + (a.news.dir > 0 ? 'good' : 'bad') }, a.news.dir > 0 ? '📰 Rising: hold or buy now' : '📰 Falling: sell now or buy later') : null),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn small grow', disabled: E.res.MK < X.buyPrice(E, r), onclick: act(() => X.buy(E, r, bq), 'Not enough Marks') }, `Buy ${bq} for ${bCost} 💠`),
+        h('button', { class: 'btn small grow', disabled: E.res[r] < 1, onclick: act(() => X.sell(E, r, sq), `No ${r} to sell`) }, `Sell ${sq} for +${sGain} 💠`)));
+  })));
+  return wrap;
+}
+
 // ---------------------------------------------------------------- network
 function network(body, E, hooks) {
   const fl = X.routeFlow(E);
   const want = Object.values(fl.want).reduce((x, v) => x + v, 0);
   const act = (fn) => () => { if (fn()) hooks.refresh(); else toast('Cannot afford that'); };
-  body.append(h('div', { class: 'item' },
+  body.append(h('div', { class: 'sect', style: { marginTop: 0 } }, '💠 Exchange'), exchangeEl(E, hooks), h('div', { class: 'sect' }, 'Trade routes'));
+  body.append(h('div', { class: 'item', 'data-tut': 'forecast' },
     h('div', { class: 'row' }, h('h4', { class: 'grow' }, 'Shipment forecast (next jump)'), h('b', null, `${fl.total}${want > fl.total ? ` / ${want}` : ''} units`)),
     h('div', { class: 'dim', style: { fontSize: '12px' } }, want > fl.total ? `${want - fl.total} units are lost to lane capacity – build parallel lanes or bigger ones.` : 'Every supplied colony ships its full yield.'),
     h('div', { class: 'faint', style: { fontSize: '12px', marginTop: '4px' } }, `Last jump ${E.lastThroughput || 0} · peak ${E.peakThroughput || 0} (the Veil wants 8) · ${X.supplyTokens(E)} Supply Token(s) earned`)));
@@ -316,7 +384,9 @@ function network(body, E, hooks) {
     const opts = X.laneOptions(E, n.id).slice(0, 3);
     body.append(h('div', { class: 'item' }, h('div', { class: 'row' }, h('h4', { class: 'grow' }, n.name), n.connected ? h('span', { class: 'chip good' }, 'Supplied') : h('span', { class: 'chip' }, 'Dormant')),
       h('div', { class: 'dim', style: { fontSize: '12px' } }, `${n.charter}: ${n.yieldN} ${n.yieldRes}/jump, ${n.charges} charges left${fl.deliver[n.id] != null && fl.deliver[n.id] < (fl.want[n.id] || 0) ? ` · only ${fl.deliver[n.id]} gets through` : ''}`),
-      h('div', { class: 'row wrap', style: { marginTop: '6px' } }, opts.map((o) => h('button', { class: 'btn small', disabled: !X.canAfford(E, o.cost), onclick: act(() => X.buildLane(E, n.id, o.to)) }, `→ ${X.node(E, o.to).name} (${X.costText(o.cost)})`)))));
+      h('div', { class: 'faint', style: { fontSize: '12px' } }, `🤝 Trade rating ${X.nodeTrade(E, n)}${n.connected ? '' : ' (counts once supplied)'}`),
+      h('div', { class: 'row wrap', style: { marginTop: '6px' } }, opts.map((o) => h('button', { class: 'btn small', disabled: !X.canAfford(E, o.cost), onclick: act(() => X.buildLane(E, n.id, o.to)) }, `→ ${X.node(E, o.to).name} (${X.costText(o.cost)})`)),
+        X.postCost(E, n) ? costBtn(E, `🏪 Trade Post ${(n.post || 0) + 1}`, X.postCost(E, n), act(() => X.buildPost(E, n.id))) : null)));
   }
   const stranded = E.chart.nodes.filter((n) => n.state === 'stranded' && n.type !== 'boss');
   if (stranded.length) {
@@ -330,7 +400,7 @@ function directorate(body, E, hooks) {
   const act = (fn) => () => { if (fn()) hooks.refresh(); else toast('Cannot afford that'); };
   body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, `Your treaty holds up to ${X.maxClans(E)} active clans. You start with one; secure Clan Enclaves to bring more in. Each draw picks an active clan by Presence weight, then a card by rarity × Favor weight (Common 1, Uncommon 0.6, Rare 0.3).`));
   const tk = X.dirTokens(E);
-  body.append(h('div', { class: 'item row wrap' }, h('b', null, 'Free picks:'), h('span', { class: 'chip' + (tk.fav ? ' good' : '') }, `⭐ ${tk.fav} Favor`), h('span', { class: 'chip' + (tk.ban ? ' good' : '') }, `🚫 ${tk.ban} Ban`), h('span', { class: 'faint', style: { fontSize: '12px' } }, '+1 of each after every planet. Spent before Credits.')));
+  body.append(h('div', { class: 'item row wrap', 'data-tut': 'picks' }, h('b', null, 'Free picks:'), h('span', { class: 'chip' + (tk.fav ? ' good' : '') }, `⭐ ${tk.fav} Favor`), h('span', { class: 'chip' + (tk.ban ? ' good' : '') }, `🚫 ${tk.ban} Ban`), h('span', { class: 'faint', style: { fontSize: '12px' } }, '+1 of each after every planet. Spent before Credits.')));
   const slots = h('div', { class: 'row wrap', style: { marginBottom: '8px' } }, E.clans.map((c) => clanChip(c, ' ✓')));
   for (let i = E.clans.length; i < X.maxClans(E); i++) slots.append(h('span', { class: 'chip faint' }, '◌ empty slot'));
   body.append(slots);
@@ -347,7 +417,7 @@ function directorate(body, E, hooks) {
     const totW = cards.reduce((sum, c) => sum + (E.dir.ban.includes(c.id) ? 0 : RARITY[c.r].w * (E.dir.fav[c.id] || 1)), 0);
     const elv = E.enh[cl] || 0;
     const ec = X.enhCost(E, cl);
-    const details = h('details', null, h('summary', { class: 'dim', style: { cursor: 'pointer', margin: '6px 0' } }, `Card pool & favors (${cards.length} cards)`),
+    const details = h('details', { 'data-tut': 'pool-' + cl }, h('summary', { class: 'dim', style: { cursor: 'pointer', margin: '6px 0' } }, `Card pool & favors (${cards.length} cards)`),
       h('div', { class: 'list' }, cards.map((c) => {
         const banned = E.dir.ban.includes(c.id);
         const fv = E.dir.fav[c.id] || 1;
@@ -357,12 +427,12 @@ function directorate(body, E, hooks) {
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
             h('span', { class: 'pp pill-' + c.r }, rubric(c).pp + ' PP'),
             banned ? h('button', { class: 'btn small', disabled: !X.canAfford(E, X.DIR_COST.restore), onclick: act(() => X.restore(E, c.id)) }, 'Restore')
-              : [fv < 3 ? h('button', { class: 'btn small', disabled: !tk.fav && !X.canAfford(E, X.DIR_COST.fav[fv - 1]), onclick: act(() => X.favorUp(E, c.id)) }, `Favor ×${fv + 1}${tk.fav ? ' (free)' : ''}`) : h('span', { class: 'chip' }, 'Favored ×3'),
-                X.canBan(E, c.id) ? h('button', { class: 'btn small danger', disabled: !tk.ban && !X.canAfford(E, X.DIR_COST.ban), onclick: act(() => X.ban(E, c.id)) }, `Ban${tk.ban ? ' (free)' : ''}`) : null]));
+              : [fv < 3 ? h('button', { class: 'btn small', 'data-tut': 'fav-' + c.id, disabled: !tk.fav && !X.canAfford(E, X.DIR_COST.fav[fv - 1]), onclick: act(() => X.favorUp(E, c.id)) }, `Favor ×${fv + 1}${tk.fav ? ' (free)' : ''}`) : h('span', { class: 'chip' }, 'Favored ×3'),
+                X.canBan(E, c.id) ? h('button', { class: 'btn small danger', 'data-tut': 'ban-' + c.id, disabled: !tk.ban && !X.canAfford(E, X.DIR_COST.ban), onclick: act(() => X.ban(E, c.id)) }, `Ban${tk.ban ? ' (free)' : ''}`) : null]));
       })));
     body.append(h('div', { class: 'item', style: { borderColor: active ? CLANS[cl].col : 'var(--line)' } },
       h('div', { class: 'row' }, h('h4', { class: 'grow', style: { color: CLANS[cl].col } }, `${CLANS[cl].ic} ${CLANS[cl].n}`), h('span', { class: 'chip' }, active ? 'Active' : 'Bench')),
-      h('div', { class: 'dim', style: { fontSize: '12px' } }, CLANS[cl].d),
+      h('div', { class: 'dim', style: { fontSize: '12px' } }, CLANS[cl].d, ' ', CLANS[cl].play),
       h('div', { class: 'row', style: { marginTop: '6px' } }, h('span', null, `Presence ${pres}/3`),
         pres < 3 ? h('button', { class: 'btn small', disabled: !X.canAfford(E, X.DIR_COST.presence[pres - 1]), onclick: act(() => X.presenceUp(E, cl)) }, `Raise (${X.costText(X.DIR_COST.presence[pres - 1])})`) : null),
       h('div', { style: { marginTop: '6px', fontSize: '12px' } },
@@ -383,7 +453,7 @@ function foundry(body, E, hooks) {
     const c = CARDS[cid];
     const cost = X.blueprintCost(E, cid);
     const usable = E.clans.includes(c.cl) ? 'active clan' : E.licensed.includes(c.cl) ? 'licensed (bench)' : 'not yet in your treaty';
-    body.append(h('div', { class: 'item' },
+    body.append(h('div', { class: 'item', 'data-tut': 'bp-' + cid },
       h('div', { class: 'row' }, h('h4', { class: 'grow', style: { color: CLANS[c.cl].col } }, `${CLANS[c.cl].ic} ${c.n}`), costBtn(E, 'Buy', cost, () => { if (X.buyBlueprint(E, cid)) { toast(`${c.n} added to the ${CLANS[c.cl].n} pool`); hooks.refresh(); } }, { disabled: !!E.colony })),
       h('div', { class: 'faint', style: { fontSize: '11px' } }, `${c.tags.join(' · ')} · ${trigLabel(c)} · ${usable}`),
       h('div', { class: 'tx dim', style: { fontSize: '12px' } }, cardText(c.text)),
@@ -398,13 +468,13 @@ function fleet(body, E, hooks) {
   body.append(h('div', { class: 'sect' }, `Preparations for the next colony (${E.preps.length}/${E.prepSlots})`));
   body.append(h('div', { class: 'list' }, Object.entries(X.PREPS).map(([id, p]) => {
     const have = E.preps.includes(id);
-    return h('div', { class: 'item' }, h('div', { class: 'row' }, h('h4', { class: 'grow' }, p.n), have
+    return h('div', { class: 'item', 'data-tut': 'prep-' + id }, h('div', { class: 'row' }, h('h4', { class: 'grow' }, p.n), have
       ? h('button', { class: 'btn small', onclick: () => { X.refundPrep(E, id); hooks.refresh(); } }, 'Refund')
       : h('button', { class: 'btn small', disabled: !X.canAfford(E, p.cost) || E.preps.length >= E.prepSlots, onclick: () => { X.buyPrep(E, id); hooks.refresh(); } }, X.costText(p.cost))),
     h('div', { class: 'dim', style: { fontSize: '12px' } }, p.d));
   })));
   body.append(h('div', { class: 'sect' }, 'Fleet Yard (permanent this expedition)'));
-  body.append(h('div', { class: 'list' }, Object.entries(X.FLEET).map(([id, f]) => h('div', { class: 'item' },
+  body.append(h('div', { class: 'list', 'data-tut': 'yard' }, Object.entries(X.FLEET).map(([id, f]) => h('div', { class: 'item' },
     h('div', { class: 'row' }, h('h4', { class: 'grow' }, f.n), E.fleet[id] ? h('span', { class: 'chip good' }, 'Installed') : h('button', { class: 'btn small', disabled: !X.canAfford(E, f.cost) || !!E.colony, onclick: () => { X.buyFleet(E, id); hooks.refresh(); } }, X.costText(f.cost))),
     h('div', { class: 'dim', style: { fontSize: '12px' } }, f.d)))));
 }
@@ -413,7 +483,7 @@ function fleet(body, E, hooks) {
 function goals(body, E, hooks) {
   const v = X.veilStatus(E);
   const chk = (ok, txt) => h('div', { class: 'stamp' }, h('span', { class: 'ok' + (ok ? ' y' : '') }, ok ? '✓' : '…'), txt);
-  body.append(h('div', { class: 'sect' }, 'Opening the Veil'),
+  body.append(h('div', { class: 'sect', 'data-tut': 'veil' }, 'Opening the Veil'),
     chk(v.shardsOk, `Gate Shards ${v.shards}/3 – Gate Shrines and the Veil Cartography contract`),
     chk(v.throughputOk, `Supplied throughput ${v.throughput}/8 in one jump – see the Network tab`),
     chk(v.cyOk, `${v.cy}/3 CY for the final jump`),
@@ -428,7 +498,7 @@ function goals(body, E, hooks) {
     body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, 'Carry one contract at a time. New offers arrive in each sector.'));
     for (const id of E.contractOffers) {
       const c = X.CONTRACTS[id];
-      body.append(h('div', { class: 'item' }, h('div', { class: 'row' }, h('h4', { class: 'grow' }, c.n), h('button', { class: 'btn small primary', onclick: () => { X.acceptContract(E, id); hooks.refresh(); } }, 'Accept')), h('div', { class: 'dim', style: { fontSize: '12px' } }, c.d), h('div', { class: 'good', style: { fontSize: '12px' } }, 'Reward: ' + c.reward)));
+      body.append(h('div', { class: 'item', 'data-tut': 'contract-' + id }, h('div', { class: 'row' }, h('h4', { class: 'grow' }, c.n), h('button', { class: 'btn small primary', onclick: () => { X.acceptContract(E, id); hooks.refresh(); } }, 'Accept')), h('div', { class: 'dim', style: { fontSize: '12px' } }, c.d), h('div', { class: 'good', style: { fontSize: '12px' } }, 'Reward: ' + c.reward)));
     }
   } else body.append(h('p', { class: 'dim' }, 'No contract. New offers arrive when you enter the next sector.'));
   if (E.contractsDone.length) body.append(h('p', { class: 'faint', style: { fontSize: '12px' } }, 'Completed: ' + E.contractsDone.map((c) => X.CONTRACTS[c].n).join(', ')));
@@ -448,6 +518,8 @@ export function missionEndScreen(root, E, hooks) {
   const page = h('div', { class: 'page' });
   root.append(page);
   page.append(h('div', { class: 'big-result' }, h('div', { class: 'em' }, won ? '🏴' : '💥'), h('h2', null, won ? `${n.name} secured` : `${n.name} lost`), h('p', { class: 'dim' }, S.result.reason), h('h1', null, `${S.influence} Influence`)));
+  const mk = X.missionMarks(S);
+  page.append(h('p', { class: mk ? 'good' : 'dim', style: { textAlign: 'center' }, 'data-tut': 'payout' }, `💠 Exchange payout: ${S.integrity} Integrity left × ${X.MARKS_PER_INTEGRITY} = +${mk} Marks`));
   const megas = Object.keys(S.mega || {});
   if (megas.length || (S.techs || []).length) page.append(h('p', { class: 'dim', style: { textAlign: 'center' } }, megas.length ? `Mega-projects: ${megas.length}` : '', megas.length && S.techs.length ? ' · ' : '', S.techs.length ? `Local technologies: ${S.techs.length}` : ''));
   if (n.type === 'boss') {

@@ -54,6 +54,7 @@ export const FAMILY_INFO = {
 
 // World (overworld-only) resources.
 export const WORLD = {
+  MK: { n: 'Exchange Marks', ic: '💠' },
   CR: { n: 'Coalition Credits', ic: '💳' },
   AL: { n: 'Fleet Alloys', ic: '🧱' },
   CY: { n: 'Cryo Isotopes', ic: '🧪' },

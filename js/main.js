@@ -4,6 +4,7 @@ import { titleScreen, clanSelect, codexScreen, helpScreen, setupScreen } from '.
 import { colonyScreen } from './ui/colonyView.js';
 import { overworldScreen, missionEndScreen, resBar } from './ui/overworld.js';
 import { loadSave, writeSave, clearSave, loadMeta, writeMeta } from './ui/store.js';
+import { tutorialFor, tutorialMap, tutorialColony, clearCoach } from './ui/tutorial.js';
 import { genColony } from './engine/mapgen.js';
 import { resetTurnState } from './engine/colony.js';
 import * as X from './engine/expedition.js';
@@ -28,6 +29,7 @@ function bumpMeta(S) {
 // ------------------------------------------------------------- screens
 function title() {
   closeSheets();
+  clearCoach();
   const s = loadSave();
   let info = '';
   if (s && s.kind === 'exp') info = `${s.E.clans.map((c) => CLANS[c].ic).join('')} expedition, ${s.E.claimed} claimed`;
@@ -43,7 +45,7 @@ function title() {
         title: 'Founding clan', onBack: go, min: 1, max: 1, startLabel: 'Sign the founding treaty',
         hint: 'Choose one clan to found your expedition. Secure Clan Enclaves on the star chart to recruit up to two more.',
         onStart: (clans) => {
-          app.E = X.newExpedition(opts.seed, clans, opts);
+          app.E = X.newExpedition(opts.seed, clans, { ...opts, tutorial: tutorialFor(opts.difficulty) });
           app.E.seedLabel = opts.seedLabel;
           app.practice = null;
           app.tab = 'chart';
@@ -51,7 +53,7 @@ function title() {
           writeMeta(meta);
           save();
           route();
-          setTimeout(() => toast('Tap a glowing world to plan your first jump – a 🏛️ Enclave recruits a new clan'), 400);
+          if (!app.E.tut) setTimeout(() => toast('Tap a glowing world to plan your first jump – a 🏛️ Enclave recruits a new clan'), 400);
         },
       }) });
       if (s) confirmSheet('Start over?', 'This replaces your saved game.', 'Start new', go);
@@ -78,11 +80,12 @@ function title() {
     onHelp: () => { app.back = title; help(); },
   });
 }
-function codex() { closeSheets(); codexScreen(root, { onBack: () => (app.back || route)() }); }
-function help() { closeSheets(); helpScreen(root, { onBack: () => (app.back || route)() }); }
+function codex() { closeSheets(); clearCoach(); codexScreen(root, { onBack: () => (app.back || route)() }); }
+function help() { closeSheets(); clearCoach(); helpScreen(root, { onBack: () => (app.back || route)() }); }
 
 function route() {
   closeSheets();
+  clearCoach();
   app.back = null;
   if (app.practice) return practiceColony();
   if (!app.E) return title();
@@ -103,16 +106,18 @@ function route() {
     },
     menu: overworldMenu,
   }, app.tab);
+  if (E.tut) tutorialMap(E, { tab: app.tab, save, refresh: () => { save(); route(); } });
 }
 
 function colonyHooks(undo, onDone, abandon) {
   return {
     save, undo,
-    onDone: () => { bumpMeta(app.E ? app.E.colony : app.practice); save(); onDone(); },
+    onRender: (ctx) => { if (app.E && app.E.tut) tutorialColony(app.E, { ...ctx, save }); },
+    onDone: () => { clearCoach(); bumpMeta(app.E ? app.E.colony : app.practice); save(); onDone(); },
     codex: () => { app.back = route; codex(); },
     help: () => { app.back = route; help(); },
     quit: () => { save(); title(); },
-    abandon,
+    abandon: () => { clearCoach(); abandon(); },
   };
 }
 

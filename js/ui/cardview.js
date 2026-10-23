@@ -60,8 +60,9 @@ export function cardEl(cid, opts = {}) {
     h('div', { class: 'band' }, h('span', { class: 'chip' }, cl.ic, ' ', cl.s || cl.n), h('span', { class: 'gem', style: { background: RARITY[c.r].col }, title: RARITY[c.r].n })),
     h('div', { class: 'nm' }, c.n)),
   h('div', { class: 'meta' }, `${TIER[c.t]} · `, h('span', { class: 'pill-' + c.r }, RARITY[c.r].n), ` · ${trigLabel(c)}`),
-  h('div', { style: { padding: '2px 6px 0' } }, c.tags.map((t) => h('span', { class: 'tag' }, t))),
+  h('div', { style: { padding: '2px 6px 0' } }, c.tags.map((t) => h('span', { class: 'tag' }, t)), c.ally ? h('span', { class: 'tag ally', title: `Synergy: feeds on ${CLANS[c.ally].n}` }, '🔗 ', CLANS[c.ally].ic) : null),
   h('div', { class: 'tx' }, cardText(c.text)),
+  opts.big && c.ally ? h('div', { class: 'meta', style: { padding: '6px 6px 0' } }, '🔗 Synergy card: feeds on ', h('b', { style: { color: CLANS[c.ally].col } }, `${CLANS[c.ally].ic} ${CLANS[c.ally].n}`), ', but works alone.') : null,
   opts.big && c.cl !== 'neutral' ? h('div', { class: 'meta', style: { padding: '6px 6px 8px' } }, `Rubric power `, h('b', { class: 'pp pill-' + c.r }, rubric(c).pp), ` PP · measured ${MEASURED[c.id] ?? '–'} PP`) : null,
   h('div', { class: 'rar', style: { background: RARITY[c.r].col } }));
 }

@@ -27,7 +27,7 @@ export const DIFFICULTY = {
 };
 export const MODIFIERS = {
   volatile: { n: 'Volatile Space', ic: '☄️', d: 'Every colony gets the extra deep-space event schedule.' },
-  scarcity: { n: 'Scarce Markets', ic: '📉', d: 'Claim shipments are 1 smaller and Freeport prices are worse.' },
+  scarcity: { n: 'Scarce Markets', ic: '📉', d: 'Claim shipments are 1 smaller and Exchange spreads are 8% wider.' },
   tight: { n: 'Closing Veil', ic: '⏳', d: '−2 maximum Frontier Pressure.' },
   ironman: { n: 'Ironman', ic: '🪨', d: 'No undo, whatever the difficulty.' },
   lone: { n: 'Lone Clan', ic: '🧭', d: 'Only one other clan may ever join your treaty (max 2 active).' },
@@ -42,12 +42,12 @@ export const NODE_TYPES = {
   prospect: { n: 'Prospect Colony', ic: '🪐', d: 'A standard colony with ordinary abundance and hazards.' },
   bonanza: { n: 'Bonanza Colony', ic: '💰', d: 'One resource in extreme abundance – bigger shipments, nastier events.' },
   enclave: { n: 'Clan Enclave', ic: '🏛️', d: 'A resident clan joins you on this map. Secure it and the clan joins your treaty (or is licensed if all slots are full).' },
-  relay: { n: 'Relay Rock', ic: '📶', d: 'A short 15-turn colony. Weaker shipments, long-lasting route yields and +2 capacity on its lanes.' },
+  relay: { n: 'Relay Rock', ic: '📶', d: 'A short 15-turn colony. Weaker shipments, long-lasting route yields, +2 capacity on its lanes and +2 Trade Strength once supplied.' },
   derelict: { n: 'Derelict Station', ic: '🛸', d: 'Wreckage everywhere. Bonus Credits and Alloys, and a Foundry discount.' },
   observatory: { n: 'Research Observatory', ic: '🔭', d: 'Crystal-rich world. Bonus Star Data and +2 survey range.' },
   fault: { n: 'Fault World', ic: '🌋', d: 'Tremors and faults. Higher checkpoints, +3 shipment.' },
   shrine: { n: 'Gate Shrine', ic: '🔺', d: 'Secure it to earn a Gate Shard toward the Mythic Crown.' },
-  freeport: { n: 'Freeport', ic: '⚓', d: 'No colony. Trade resources, swap clans, refresh the Foundry. A supplied network hub.' },
+  freeport: { n: 'Freeport', ic: '⚓', d: 'No colony. Tighter Exchange spreads while docked, clan swaps and Foundry refreshes. A supplied network hub worth +2 Trade Strength.' },
   boss: { n: 'Mythic Superplanet', ic: '🌟', d: 'The finale: a huge environmental boss colony.' },
 };
 
@@ -189,8 +189,9 @@ export function newExpedition(seed, clans, opts = {}) {
   const D = DIFFICULTY[difficulty];
   const purse = { CR: 6, AL: 4, CY: 5, GE: 1, DA: 2 };
   for (const r in purse) purse[r] = Math.max(0, purse[r] + D.purse);
+  purse.MK = START_MARKS + 5 * D.purse;
   const E = {
-    v: 2, seed, clans: clans.slice(), licensed: clans.slice(), contacts: [],
+    v: 3, seed, clans: clans.slice(), licensed: clans.slice(), contacts: [],
     difficulty, mods,
     dir: { presence: {}, fav: {}, ban: [], research: 0, extra: {}, tokens: { fav: 1, ban: 1 } },
     enh: {},
@@ -205,16 +206,28 @@ export function newExpedition(seed, clans, opts = {}) {
     colony: null, mission: null, pending: null,
     log: [{ t: 0, m: `Treaty signed with ${clans.map((c) => CLANS[c].n).join(', ')}. Find Clan Enclaves to grow your treaty (up to ${mods.includes('lone') ? 2 : MAX_CLANS} active clans).` }],
     status: 'active', claimed: 0, jumps: 0, totalInfluence: 0, peakThroughput: 0, lastThroughput: 0,
+    tut: opts.tutorial ? { step: 0 } : null,
   };
+  initMarket(E);
   refreshFoundry(E, true);
   offerContracts(E);
   recompute(E);
   return E;
 }
 
-// Older saves (v1) tracked connections as node.parent + node.connected.
+// Older saves: v1 tracked connections as node.parent + node.connected; v2
+// predates Marks and the Exchange.
 export function migrate(E) {
-  if (!E || E.v >= 2) return E;
+  if (!E) return E;
+  if (E.v < 2) migrateV1(E);
+  if (E.v < 3) {
+    E.v = 3;
+    E.res.MK = E.res.MK ?? START_MARKS;
+    initMarket(E);
+  }
+  return E;
+}
+function migrateV1(E) {
   E.v = 2;
   E.lanes = [];
   E.nextLane = 1;
@@ -225,7 +238,6 @@ export function migrate(E) {
   E.dir.extra = E.dir.extra || {};
   refreshFoundry(E, true);
   recompute(E);
-  return E;
 }
 
 // ---------------------------------------------------------------- helpers
@@ -245,6 +257,11 @@ function gain(E, got, out) {
   }
 }
 export const costText = (cost) => Object.entries(cost).map(([r, n]) => `${n} ${r}`).join(' + ');
+// Hand out resources from outside the normal economy (tutorial gifts).
+export function grant(E, got, why) {
+  gain(E, got);
+  log(E, `${why}: ${gainText(got)}.`);
+}
 const gainText = (got) => Object.entries(got).map(([r, v]) => `+${v} ${r}`).join(', ');
 function log(E, m) {
   E.log.push({ t: E.jumps, m });
@@ -472,6 +489,8 @@ function collectRoutes(E) {
     if (v > 0) { gain(E, { [n.yieldRes]: v }, got); n.charges--; }
   }
   if (compactActive(E, 'industrial')) gain(E, { AL: 1 }, got);
+  const div = dividend(E);
+  if (div) gain(E, { MK: div }, got);
   E.lastThroughput = fl.total;
   E.peakThroughput = Math.max(E.peakThroughput || 0, fl.total);
   const lost = Object.values(fl.want).reduce((s, v) => s + v, 0) - fl.total;
@@ -666,6 +685,8 @@ export const FLEET = {
   embassy: { n: 'Mobile Embassy', cost: { CR: 5, DA: 4 }, d: 'One treaty amendment per sector anywhere on the chart, without a Freeport.' },
   slot3: { n: 'Third Preparation Slot', cost: { AL: 6, CR: 4 }, d: 'Carry three Preparations into each colony instead of two.' },
   tug: { n: 'Rescue Tug', cost: { AL: 4, CY: 3 }, d: 'Stranded Site rescues cost 1 AL + 1 CY instead of 3 AL + 2 CY.' },
+  uplink: { n: 'Market Uplink', cost: { MK: 25, DA: 2 }, d: '+2 Trade Strength: tighter Exchange spreads and bigger dividends.', trade: 2 },
+  guild: { n: 'Brokers\' Guild Charter', cost: { MK: 45, CR: 3 }, d: '+3 Trade Strength.', trade: 3 },
 };
 export function buyFleet(E, id) {
   if (E.fleet[id] || E.colony || !pay(E, FLEET[id].cost)) return false;
@@ -720,6 +741,7 @@ export function travel(E, toId, opts = {}) {
   applyCrises(E);
   recompute(E);
   collectRoutes(E);
+  tickMarket(E);
   spawnCrisis(E);
   if (sectorOf(n.layer) !== fromSec) {
     refreshFoundry(E, true);
@@ -810,6 +832,11 @@ export function resolveMission(E, charterFam) {
   const n = node(E, E.mission.node);
   E.totalInfluence += S.influence;
   const out = { gained: {}, licensed: null, joined: null, shard: false, contact: null };
+  const mk = missionMarks(S);
+  if (mk) {
+    gain(E, { MK: mk }, out.gained);
+    log(E, `Exchange payout: +${mk} MK for ${S.integrity} Integrity left on ${n.name}.`);
+  }
   if (n.type === 'boss') {
     n.state = S.status === 'won' ? 'claimed' : 'stranded';
     if (S.status === 'won') {
@@ -1019,30 +1046,173 @@ export function buyBlueprint(E, cid) {
   return true;
 }
 
-// ---------------------------------------------------------------- Freeport exchange
-const BASE_EXCHANGE = [
-  { id: 'sellAL', d: 'Sell 2 AL → 3 CR', give: { AL: 2 }, get: { CR: 3 } },
-  { id: 'sellCY', d: 'Sell 2 CY → 3 CR', give: { CY: 2 }, get: { CR: 3 } },
-  { id: 'sellGE', d: 'Sell 2 GE → 3 CR', give: { GE: 2 }, get: { CR: 3 } },
-  { id: 'buyAL', d: 'Buy 1 AL for 3 CR', give: { CR: 3 }, get: { AL: 1 } },
-  { id: 'buyCY', d: 'Buy 1 CY for 3 CR', give: { CR: 3 }, get: { CY: 1 } },
-  { id: 'buyGE', d: 'Buy 1 GE for 4 CR', give: { CR: 4 }, get: { GE: 1 } },
-  { id: 'buyDA', d: 'Buy 1 DA for 5 CR', give: { CR: 5 }, get: { DA: 1 } },
-  { id: 'dataAL', d: 'Trade 2 DA → 1 AL', give: { DA: 2 }, get: { AL: 1 } },
-];
-export const EXCHANGE = BASE_EXCHANGE;
-export function exchangeRates(E) {
-  if (!hasMod(E, 'scarcity')) return BASE_EXCHANGE;
-  return BASE_EXCHANGE.map((x) => {
-    const give = Object.fromEntries(Object.entries(x.give).map(([r, v]) => [r, x.id.startsWith('buy') ? v + 1 : v]));
-    return { ...x, give, d: `${x.d.split(' for ')[0]}${x.id.startsWith('buy') ? ` for ${give.CR} CR` : ''}` };
-  });
+// ---------------------------------------------------------------- the Exchange
+// Marks (MK) are the common currency: every world resource except Gate Shards
+// trades against them on the Network tab. Prices move on every jump like a
+// ticker – random shocks, a pull back toward a fair value that shifts as the
+// expedition pushes into deeper sectors, and wire-service news announced a
+// jump ahead. Trade Strength (supplied network nodes, Trade Posts, Fleet Yard
+// uplinks, compacts) narrows the gap between buy and sell prices.
+export const START_MARKS = 20;
+export const MARKS_PER_INTEGRITY = 3;
+export const missionMarks = (S) => Math.max(0, S.integrity) * MARKS_PER_INTEGRITY;
+export const COMMODITIES = ['CR', 'AL', 'CY', 'GE', 'DA'];
+// base: fair price in Marks in the first sector; vol: per-jump swing;
+// trend: fair-price drift per sector (fuel and data grow scarcer near the Veil).
+export const MARKET = {
+  CR: { base: 10, vol: 0.08, trend: -0.03 },
+  AL: { base: 14, vol: 0.12, trend: 0 },
+  CY: { base: 14, vol: 0.13, trend: 0.08 },
+  GE: { base: 18, vol: 0.15, trend: 0.03 },
+  DA: { base: 22, vol: 0.13, trend: 0.06 },
+};
+const NEWS = {
+  CR: [['Coalition treasury floods the lanes with fresh Credits', -1], ['A run on the Ark Reach banks', 1]],
+  AL: [['A derelict armada is broken up for scrap', -1], ['Shipyards along the Shatter Belt bid for hull plate', 1]],
+  CY: [['A comet swarm fills the isotope tanks', -1], ['Ice haulers strike in the Vesper Drift', 1]],
+  GE: [['A seed-vault surplus is auctioned off', -1], ['Blight on the garden worlds', 1]],
+  DA: [['An open-source star survey leaks onto the lanes', -1], ['Veil cartographers buy every scan in sight', 1]],
+};
+const IMPACT = 0.03; // each unit bought (sold) nudges the price up (down) by 3%
+const NEWS_PUSH = 0.16;
+
+// Opens with a few jumps of price history so the ticker has a trend to read.
+function initMarket(E) {
+  const m = { seed: hashStr('market' + E.seed), price: {}, hist: {}, news: [] };
+  E.market = m;
+  for (const r of COMMODITIES) {
+    const fair = fairPrice(E, r);
+    let p = fair * Math.exp(gauss(m) * MARKET[r].vol);
+    m.hist[r] = [round1(p)];
+    for (let i = 0; i < 5; i++) {
+      p *= Math.exp(gauss(m) * MARKET[r].vol + 0.25 * Math.log(fair / p));
+      m.hist[r].push(round1(p));
+    }
+    m.price[r] = p;
+  }
 }
-export function exchange(E, id) {
-  const x = exchangeRates(E).find((e) => e.id === id);
-  if (!x || !atHub(E)) return false;
-  if (!pay(E, x.give)) return false;
-  gain(E, x.get);
+const round1 = (v) => Math.round(v * 10) / 10;
+function gauss(o) {
+  return Math.sqrt(-2 * Math.log(1 - rnd(o))) * Math.cos(2 * Math.PI * rnd(o));
+}
+export function fairPrice(E, r) {
+  const sec = Math.max(1, Math.min(4, sectorOf(here(E).layer)));
+  return MARKET[r].base * (1 + MARKET[r].trend * (sec - 1));
+}
+// One ticker step per jump: queued news hits, shocks land, prices drift home.
+function tickMarket(E) {
+  const m = E.market;
+  for (const r of COMMODITIES) {
+    const fair = fairPrice(E, r);
+    let drift = gauss(m) * MARKET[r].vol + 0.25 * Math.log(fair / m.price[r]);
+    for (const n of m.news) if (n.r === r) drift += NEWS_PUSH * n.dir;
+    m.price[r] = Math.max(0.45 * fair, Math.min(2.2 * fair, m.price[r] * Math.exp(drift)));
+    m.hist[r] = m.hist[r].concat(round1(m.price[r])).slice(-10);
+  }
+  for (const n of m.news) n.left--;
+  m.news = m.news.filter((n) => n.left > 0);
+  if (rnd(m) < 0.4) {
+    const r = pick(m, COMMODITIES.filter((x) => !m.news.some((n) => n.r === x)));
+    if (r) {
+      const [headline, dir] = pick(m, NEWS[r]);
+      m.news.push({ r, dir, n: headline, left: 2 });
+      log(E, `📰 Market wire: ${headline} – ${r} expected to ${dir > 0 ? 'rise' : 'fall'} over the next two jumps.`);
+    }
+  }
+}
+
+// Trade Strength: what each supplied network node contributes, by world type.
+export const TRADE_RATING = { ark: 2, freeport: 2, relay: 2, prospect: 1, bonanza: 1, enclave: 1, derelict: 1, observatory: 1, fault: 0, shrine: 0, boss: 0 };
+export const TRADE_POST = [{ MK: 15, AL: 2 }, { MK: 30, AL: 3 }];
+export const TRADE_TIERS = [[0, 'Peddler'], [4, 'Broker'], [8, 'Merchant House'], [12, 'Trade Baron'], [16, 'Market Sovereign']];
+// Rating a node would have once claimed (or docked) and supplied.
+export function nodeTrade(E, n) {
+  if (n.type === 'boss') return 0;
+  return TRADE_RATING[n.type] + (n.charter === CHARTERS.trade.n ? 2 : 0) + (n.post || 0);
+}
+export function tradeStrength(E) {
+  const parts = [];
+  for (const n of E.chart.nodes) {
+    if (!n.connected || !isNetNode(n)) continue;
+    const v = nodeTrade(E, n);
+    if (v) parts.push({ n: n.name, v });
+  }
+  for (const [id, f] of Object.entries(FLEET)) if (f.trade && E.fleet[id]) parts.push({ n: f.n, v: f.trade });
+  if (E.compacts.length) parts.push({ n: `Trade Compacts ×${E.compacts.length}`, v: E.compacts.length });
+  const total = parts.reduce((s, p) => s + p.v, 0);
+  const tier = TRADE_TIERS.filter(([at]) => total >= at).at(-1);
+  const next = TRADE_TIERS.find(([at]) => at > total) || null;
+  return { total, parts, tier: tier[1], next };
+}
+// Marks paid into the purse on every jump by the network.
+export const dividend = (E) => Math.floor(tradeStrength(E).total / 3);
+export function spread(E) {
+  let s = Math.max(0.06, 0.36 - 0.025 * tradeStrength(E).total);
+  if (hasMod(E, 'scarcity')) s += 0.08;
+  if (atHub(E)) s -= 0.04;
+  return Math.max(0.04, s);
+}
+const priceAt = (E, p, side) => Math.max(1, Math.round(p * (side === 'buy' ? 1 + spread(E) : 1 - spread(E))));
+export const buyPrice = (E, r) => priceAt(E, E.market.price[r], 'buy');
+export const sellPrice = (E, r) => priceAt(E, E.market.price[r], 'sell');
+// Total Marks for `qty` units, walking the price as each unit moves the market.
+export function quote(E, r, qty, side) {
+  let p = E.market.price[r], total = 0;
+  for (let i = 0; i < qty; i++) {
+    total += priceAt(E, p, side);
+    p *= side === 'buy' ? 1 + IMPACT : 1 - IMPACT;
+  }
+  return total;
+}
+export function buy(E, r, qty = 1) {
+  if (E.colony || !COMMODITIES.includes(r)) return 0;
+  let n = 0, paid = 0;
+  for (; n < qty; n++) {
+    const p = buyPrice(E, r);
+    if (E.res.MK < p) break;
+    E.res.MK -= p;
+    E.res[r] += 1;
+    paid += p;
+    E.market.price[r] *= 1 + IMPACT;
+  }
+  if (n) log(E, `Exchange: bought ${n} ${r} for ${paid} MK.`);
+  return n;
+}
+export function sell(E, r, qty = 1) {
+  if (E.colony || !COMMODITIES.includes(r)) return 0;
+  let n = 0, got = 0;
+  for (; n < qty && E.res[r] > 0; n++) {
+    const p = sellPrice(E, r);
+    E.res[r] -= 1;
+    E.res.MK += p;
+    got += p;
+    E.market.price[r] *= 1 - IMPACT;
+  }
+  if (n) log(E, `Exchange: sold ${n} ${r} for ${got} MK.`);
+  return n;
+}
+// Advice for the ticker: how today's price compares with fair value, plus any wire news.
+const GRADES = [[1.25, 'great', 'bad'], [1.1, 'good', 'poor'], [0.91, 'fair', 'fair'], [0.81, 'poor', 'good'], [0, 'bad', 'great']];
+export function priceAdvice(E, r) {
+  const fair = fairPrice(E, r);
+  const ratio = E.market.price[r] / fair;
+  const [, sellG, buyG] = GRADES.find(([at]) => ratio >= at);
+  const news = E.market.news.find((n) => n.r === r) || null;
+  const h = E.market.hist[r];
+  const change = h.length > 1 ? h.at(-1) / h.at(-2) - 1 : 0;
+  return { fair, ratio, sell: sellG, buy: buyG, news, change };
+}
+// Trade Posts raise a network node's own rating (two levels).
+export function postCost(E, n) {
+  const lv = n.post || 0;
+  return lv < TRADE_POST.length ? TRADE_POST[lv] : null;
+}
+export function buildPost(E, id) {
+  const n = node(E, id);
+  const cost = postCost(E, n);
+  if (E.colony || !isNetNode(n) || n.type === 'boss' || !cost || !pay(E, cost)) return false;
+  n.post = (n.post || 0) + 1;
+  log(E, `Trade Post ${n.post === 1 ? 'opened' : 'expanded'} at ${n.name} (+1 Trade Strength while supplied).`);
   return true;
 }
 

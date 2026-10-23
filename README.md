@@ -23,7 +23,7 @@ To try it on a phone, run the server on your computer and open `http://<your-com
 
 ## Saving
 
-Progress saves automatically to the browser's `localStorage` after every action (key `astral-expanse.save.v1`), so you can close the tab and continue later. Saves from before the single-clan update are migrated automatically when you continue. Saves are per-browser and per-device; clearing site data removes them. In private windows or if storage is blocked, the game still runs, just without saving.
+Progress saves automatically to the browser's `localStorage` after every action (key `astral-expanse.save.v1`), so you can close the tab and continue later. Saves from before the single-clan update or the Exchange are migrated automatically when you continue (older expeditions start with 20 Marks and no tutorial). Saves are per-browser and per-device; clearing site data removes them. In private windows or if storage is blocked, the game still runs, just without saving.
 
 ## How to play: a walkthrough
 
@@ -33,7 +33,7 @@ This section walks through a first expedition. The in-game **❓ How to play** s
 
 From the title screen choose **🚀 New expedition**.
 
-1. **Pick a difficulty.** *Explorer* is the gentlest, with unlimited undo, a richer purse and a longer clock. *Standard* is the intended balance and allows one undo per turn. *Veteran* and *Nightmare* raise the checkpoints, shorten the clock, make route crises more frequent and remove undo.
+1. **Pick a difficulty.** *Explorer* is the gentlest, with unlimited undo, a richer purse and a longer clock. *Standard* is the intended balance and allows one undo per turn. Both open with a **guided tour**: coach marks walk you through every star-chart tab (favoring and banning a card, crafting a Foundry blueprint with gifted resources, buying a Preparation, accepting a contract), the Exchange, and your first three colony moves. *Skip tutorial* on any bubble ends it. *Veteran* and *Nightmare* raise the checkpoints, shorten the clock, make route crises more frequent and remove undo.
 2. **Add modifiers (optional).** *Volatile Space* gives every colony extra events. *Scarce Markets* means smaller shipments and worse prices. *Closing Veil* means −2 maximum Frontier Pressure. *Ironman* means no undo. *Lone Clan* caps your treaty at two clans.
 3. **Pick a seed.** *Random*, today's *Daily* chart, or a *Custom* word or number. The same seed produces the same star chart, so friends can race the same expedition.
 4. **Choose one founding clan.** You start small. Each clan's card shows its starter building, and the Codex shows its whole card pool.
@@ -59,6 +59,7 @@ Each colony is a hex asteroid that you build up one card per turn.
 5. **Hit the checkpoints.** Every 5 turns, and on the final turn, you must earn an Influence target. Each checkpoint counts only Influence earned since the previous one, so a miss never leaves you behind on the next; your total still counts toward Masterwork and the expedition score. Missing one costs 3 Integrity, and missing the final one fails the colony. Each checkpoint you meet (except the last) offers a **🔬 local technology** for the rest of that map, for example Overclock, Shield Grid or Supply Drones.
 6. **Go for mega-projects.** **🎯 Goals** tracks six arrangements, such as *Artificial Dawn* (Solar + Power network) and *Deep Biosphere* (connected Bio buildings on Pressurized ground). Completing one scores +12 and grants a lasting perk.
 7. **Draws.** You draw 1 card per turn, +1 if two of your clans activated last turn (or your only clan did), and +1 more if all three did.
+8. **Synergy cards.** Every clan has an Early Common and a Mid Uncommon marked 🔗 that feed on another clan's resources (Ironwake on Wreckborn Scrap and Heliarch heat, Heliarch on Cryostead ice and Synapse signals, Cryostead on Verdant biomass and Hearthline pressure, Verdant on Umbra anomalies and Ironwake caverns, Synapse on Hearthline habitats and Wreckborn salvage, Wreckborn on Kepler launches and Umbra radiation, Kepler on Ironwake metal and Cryostead ice, Hearthline on Kepler arrivals and Verdant biomass, Umbra on Heliarch heat and Synapse repeats). The links are one-way: no two clans feed on each other. Each works alone but is much stronger with its partner in the treaty.
 
 ### 4. Claim a charter
 
@@ -87,7 +88,8 @@ From Frontier Pressure 4 onwards, **route crises** are forecast one jump ahead: 
 - **Foundry:** 18 shop-only blueprints, two per clan. Buying one adds it to that clan's draw pool. Offers refresh in each new sector, or for 2 CR at a Freeport.
 - **Fleet:** up to two one-shot **Preparations** for the next colony (deep scans, ice pods, insurance, an emergency shuttle and more). The **Fleet Yard** sells permanent upgrades: Survey Mast, Cargo Keel, Cold-Chain Engine, Mobile Embassy, a third Preparation slot and a Rescue Tug.
 - **Goals:** carry one **sector contract** at a time, such as *Cryogenic Corridor* or *Veil Cartography*, for bonus rewards. The tab also tracks your Veil checklist and the log.
-- **Freeports / Arkship services:** exchange resources at imperfect rates, amend your treaty (swap a licensed clan in or fill an empty slot), and complete licenses for clans you contacted but failed to secure.
+- **Exchange (Network tab):** buy and sell CR, AL, CY, GE and DA for 💠 **Marks**, the common currency. Prices move on every jump like a stock ticker (random shocks, a pull back toward a fair value that shifts by sector, and market-wire news announced a jump ahead), and each row grades the price as a good or bad buy or sell. Each unit traded nudges the price 3%. **Trade Strength** narrows the buy/sell spread (from about 31% down to 6%) and pays a dividend of 1 Mark per jump per 3 strength. It comes from supplied network nodes (Arkship, Freeports and Relay Rocks +2; most colonies +1; Fault Worlds and Gate Shrines 0), Free Trade Enclave charters (+2), **Trade Posts** (+1 per level, two levels per node), the Fleet Yard's Market Uplink (+2) and Brokers' Guild Charter (+3), and +1 per Trade Compact. Every colony pays **3 Marks per Integrity left** when it ends.
+- **Freeports / Arkship services:** Exchange spreads are 4% tighter while docked; amend your treaty (swap a licensed clan in or fill an empty slot), and complete licenses for clans you contacted but failed to secure.
 
 A failed colony becomes a **Stranded Site**. You can rescue it later from the Network tab, which turns it into a small Salvage Outpost.
 
@@ -112,9 +114,9 @@ Each boss shows its stabilization objective before you commit. Win, and your end
 
 **Colony map:** procedural hex asteroids with Surface, Rock/Caverns and Orbital slots; a four-phase light cycle; multi-unit deposits; statuses; forecast local events; Integrity; Influence checkpoints; reactive cascades with a two-activation cap; placement forecasts, hints, undo and an activation log. **Local technologies** are offered at every met checkpoint, and six **mega-projects** are recognized automatically.
 
-**All 9 clans and all 135 base buildings** (7 Common / 5 Uncommon / 3 Rare per clan), plus the **Card Foundry's 18 shop-only blueprints**, all scored on the same rubric.
+**All 9 clans and 153 base buildings** (8 Common / 6 Uncommon / 3 Rare per clan, including two one-way 🔗 synergy cards per clan), plus the **Card Foundry's 18 shop-only blueprints**, all scored on the same rubric.
 
-**Expedition:** a single founding clan that grows to at most three active clans through Clan Enclaves (guest join, license, contact, Freeport swaps, Mobile Embassy, Veil swap); a branching star chart with a survey horizon; the full node roster; Frontier Pressure; charters and stamps; a **lane graph with capacity** (max-flow routing, trade policies); **route crises** with forecasts, fixes and lane upgrades; **trade rings and Trade Compacts**; **sector contracts**; the Clan Directorate with **Clan Enhancements**; Preparations and **Fleet Yard upgrades**; Stranded Site rescue; the Veil checklist with **finale Supply Tokens**; three superplanet bosses; and the **Endless Frontier**. **Difficulty presets**, **run modifiers** and **seeded/daily charts** are chosen at setup.
+**Expedition:** a guided first-run tour (Explorer and Standard); the Marks Exchange with a moving market, Trade Strength, Trade Posts and dividends; a single founding clan that grows to at most three active clans through Clan Enclaves (guest join, license, contact, Freeport swaps, Mobile Embassy, Veil swap); a branching star chart with a survey horizon; the full node roster; Frontier Pressure; charters and stamps; a **lane graph with capacity** (max-flow routing, trade policies); **route crises** with forecasts, fixes and lane upgrades; **trade rings and Trade Compacts**; **sector contracts**; the Clan Directorate with **Clan Enhancements**; Preparations and **Fleet Yard upgrades**; Stranded Site rescue; the Veil checklist with **finale Supply Tokens**; three superplanet bosses; and the **Endless Frontier**. **Difficulty presets**, **run modifiers** and **seeded/daily charts** are chosen at setup.
 
 **Simplified or left out:** Clan Enhancements are one two-level track per clan rather than three branches; the Wormhole Stitch lane and the Surface Regrading preparation are not in.
 
@@ -137,11 +139,11 @@ The tools need Node 18+ (they share the game's engine modules; `package.json` on
 ```
 index.html, css/style.css      app shell and styles
 js/main.js                     screen routing and saving
-js/ui/                         colony map, star chart, codex, sheets
-js/engine/cards.js             the 135 buildings + 18 Foundry blueprints (data + effects + rubric inputs)
+js/ui/                         colony map, star chart, codex, sheets, tutorial coach marks
+js/engine/cards.js             the 153 buildings + 18 Foundry blueprints (data + effects + rubric inputs)
 js/engine/colony.js            colony rules engine, local technologies, mega-projects (pure, JSON state)
 js/engine/mapgen.js            procedural maps, checkpoints, preparations, enhancements, supply tokens
-js/engine/expedition.js        star chart, difficulty, lanes & crises, rings, contracts, Foundry, fleet, Veil, Endless
+js/engine/expedition.js        star chart, difficulty, lanes & crises, rings, contracts, Foundry, fleet, Exchange, Veil, Endless
 js/engine/rubric.js            Power Point rubric
 js/engine/ai.js                greedy bot (simulator and Hint button)
 tools/                         simulator, calibration and report scripts

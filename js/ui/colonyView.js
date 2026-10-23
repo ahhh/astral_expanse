@@ -37,7 +37,7 @@ export function colonyScreen(root, S, hooks) {
   // Optional planet art for this planet type (art/maps/<type>.webp), drawn as a globe under the land hexes.
   const backdropSrc = mapBackdrop(S.boss ? S.boss.type : S.type);
   const mapwrap = h('div', { class: 'mapwrap' }, svgEl);
-  const handEl = h('div', { class: 'hand' });
+  const handEl = h('div', { class: 'hand', 'data-tut': 'hand' });
   const actEl = h('div', { class: 'actions' });
   const tray = h('div', { class: 'tray' }, handEl, actEl);
   const sumEl = h('div', { class: 'turnsum', hidden: true, onclick: () => closeSummary() });
@@ -124,16 +124,16 @@ export function colonyScreen(root, S, hooks) {
     hud.append(
       h('div', { class: 'l1' },
         h('div', { class: 'name' }, S.name),
-        h('span', { class: 'chip', title: pname }, pic, ' ', pname),
-        h('span', { class: 'chip' }, `T${S.turn}/${S.turns}`)),
+        h('span', { class: 'chip', title: pname, 'data-tut': 'phase' }, pic, ' ', pname),
+        h('span', { class: 'chip', 'data-tut': 'turns' }, `T${S.turn}/${S.turns}`)),
       h('div', { class: 'l1' },
-        h('span', { class: 'inf', title: 'Total Influence' }, S.influence),
-        h('div', { class: 'grow' },
+        h('span', { class: 'inf', title: 'Total Influence', 'data-tut': 'influence' }, S.influence),
+        h('div', { class: 'grow', 'data-tut': 'checkpoint' },
           h('div', { class: 'cp' }, `Checkpoint ${got}/${cp.need} by turn ${cp.turn}`, done ? ' ✅' : ''),
           h('div', { class: 'meter' + (S.turn >= cp.turn - 1 && !done ? ' danger' : '') }, h('i', { style: { width: pct + '%' } }))),
-        h('span', { class: 'chip', title: 'Asteroid Integrity' }, '❤️ ', S.integrity),
+        h('span', { class: 'chip', title: 'Asteroid Integrity', 'data-tut': 'integrity' }, '❤️ ', S.integrity),
         ev ? h('button', { class: 'chip', onclick: goals }, EVENT_INFO[ev.type].ic, ` T${ev.turn}`) : null),
-      h('div', { class: 'l1', style: { fontSize: '11px' } },
+      h('div', { class: 'l1', style: { fontSize: '11px' }, 'data-tut': 'clans' },
         S.clans.map((c) => h('span', { class: 'chip', style: { borderColor: CLANS[c].col, color: CLANS[c].col } }, CLANS[c].ic, ' ', CLANS[c].n.split(' ')[0])),
         (S.techs || []).map((t) => h('span', { class: 'chip', title: TECHS[t].n }, TECHS[t].ic)),
         Object.keys(S.mega || {}).map((m) => h('span', { class: 'chip good', title: MEGA[m].n }, MEGA[m].ic)),
@@ -316,7 +316,7 @@ export function colonyScreen(root, S, hooks) {
   }
 
   // Sun compass: shows which side of the asteroid faces the sun.
-  const compass = h('div', { class: 'compass', title: 'Sun direction' });
+  const compass = h('div', { class: 'compass', title: 'Sun direction', 'data-tut': 'compass' });
   mapwrap.append(compass);
   function drawCompass() {
     const th = (S.phase * Math.PI) / 2;
@@ -327,13 +327,17 @@ export function colonyScreen(root, S, hooks) {
   function drawHand() {
     handEl.innerHTML = '';
     if (!S.hand.length) handEl.append(h('div', { class: 'dim', style: { padding: '30px 10px' } }, 'No cards in hand – pass the turn to draw.'));
-    S.hand.forEach((cid, i) => handEl.append(cardEl(cid, { sel: sel === i, onclick: () => selectCard(i) })));
+    S.hand.forEach((cid, i) => {
+      const el = cardEl(cid, { sel: sel === i, onclick: () => selectCard(i) });
+      el.dataset.tut = 'card-' + i;
+      handEl.append(el);
+    });
     actEl.innerHTML = '';
     const busy = S.status !== 'play';
     actEl.append(
       h('button', { class: 'btn', onclick: logSheet }, '📜 Log'),
-      h('button', { class: 'btn', onclick: goals }, '🎯 Goals'),
-      h('button', { class: 'btn', disabled: busy, onclick: hint }, '💡 Hint'),
+      h('button', { class: 'btn', onclick: goals, 'data-tut': 'goals' }, '🎯 Goals'),
+      h('button', { class: 'btn', disabled: busy, onclick: hint, 'data-tut': 'hint' }, '💡 Hint'),
       hooks.undo ? h('button', { class: 'btn', disabled: busy || undoLeft() <= 0, onclick: undo, title: 'Rewind your last placement or pass' }, '↶ Undo') : null,
       h('button', { class: 'btn', disabled: busy || sel == null || S.scrapped, onclick: scrap, title: 'Scrap the selected card for +1 Influence (once per turn)' }, '🗑 Scrap'),
       h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; snap = { state: clone(S), turn }; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
@@ -344,6 +348,7 @@ export function colonyScreen(root, S, hooks) {
     drawHUD();
     drawMap();
     drawHand();
+    if (hooks.onRender) hooks.onRender({ sel });
   }
 
   function selectCard(i) {

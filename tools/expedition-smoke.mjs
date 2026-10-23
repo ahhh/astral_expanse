@@ -1,6 +1,6 @@
 // Plays whole expeditions with the bot to check the overworld loop end to end:
 // a single starting clan, enclaves, lanes, crises, compacts, contracts, the
-// Foundry, the Fleet Yard, the Veil's supply tokens and one Endless round.
+// Foundry, the Fleet Yard, the Exchange, the Veil's supply tokens and one Endless round.
 //
 //   node tools/expedition-smoke.mjs [runs=3] [difficulty=standard]
 import * as X from '../js/engine/expedition.js';
@@ -38,6 +38,11 @@ function spend(E) {
   for (const f of ['keel', 'mast', 'tug']) if (!E.fleet[f] && X.canAfford(E, X.FLEET[f].cost) && E.res.AL > 9) X.buyFleet(E, f);
   for (const cl of E.clans) { const c = X.enhCost(E, cl); if (c && X.canAfford(E, c) && E.res.CR > 7) X.enhance(E, cl); }
   for (const n of E.chart.nodes) if (n.state === 'stranded' && n.type !== 'boss' && X.canAfford(E, X.rescueCost(E)) && E.res.AL > 6) X.rescue(E, n.id);
+  // Exchange: sell surplus into good prices, keep jump fuel topped up, invest in Trade Strength.
+  for (const r of X.COMMODITIES) if (E.res[r] > 10 && ['good', 'great'].includes(X.priceAdvice(E, r).sell)) X.sell(E, r, E.res[r] - 10);
+  if (E.res.CY < 4) X.buy(E, 'CY', 4 - E.res.CY);
+  for (const f of ['uplink', 'guild']) if (!E.fleet[f] && X.canAfford(E, X.FLEET[f].cost) && E.res.MK > X.FLEET[f].cost.MK + 15) X.buyFleet(E, f);
+  for (const n of E.chart.nodes) { const c = n.connected && X.isNetNode(n) && X.postCost(E, n); if (c && E.res.MK > c.MK + 20 && X.canAfford(E, c)) X.buildPost(E, n.id); }
 }
 
 for (let r = 0; r < runs; r++) {
@@ -67,6 +72,6 @@ for (let r = 0; r < runs; r++) {
     X.resolveMission(E, ch && ch.fam);
   }
   if (E.wonOnce) wins++;
-  console.log(`Run ${r} → ${E.status} ${E.ending || ''} (${E.endReason}) clans ${E.clans} pressure ${E.pressure}/${E.maxPressure} claimed ${E.claimed} lanes ${E.lanes.length} compacts ${E.compacts.length} contracts ${E.contractsDone.length} peak ${E.peakThroughput} res ${JSON.stringify(E.res)}`);
+  console.log(`Run ${r} → ${E.status} ${E.ending || ''} (${E.endReason}) clans ${E.clans} pressure ${E.pressure}/${E.maxPressure} claimed ${E.claimed} lanes ${E.lanes.length} compacts ${E.compacts.length} contracts ${E.contractsDone.length} trade ${X.tradeStrength(E).total} (${X.tradeStrength(E).tier}) peak ${E.peakThroughput} res ${JSON.stringify(E.res)}`);
 }
 console.log(`${wins}/${runs} expeditions won`);

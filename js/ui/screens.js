@@ -1,6 +1,9 @@
 import { h, sheet } from './dom.js';
 import { cardEl, cardText, trigLabel } from './cardview.js';
 import { CLANS, CLAN_IDS, CARD_LIST, RARITY, TIER } from '../engine/cards.js';
+
+// Clans whose resources a clan's synergy cards feed on.
+const allies = (cl) => CARD_LIST.filter((c) => c.cl === cl && c.ally).map((c) => c.ally);
 import { rubric, BANDS, HORIZON } from '../engine/rubric.js';
 import { STARTERS } from '../engine/mapgen.js';
 import { CARDS, FOUNDRY_LIST } from '../engine/cards.js';
@@ -35,6 +38,7 @@ export function setupScreen(root, { onBack, onNext }) {
     body.innerHTML = '';
     body.append(h('div', { class: 'sect', style: { marginTop: 0 } }, 'Difficulty'),
       h('div', { class: 'opt-grid' }, Object.entries(DIFFICULTY).map(([id, d]) => h('button', { class: 'opt' + (diff === id ? ' on' : ''), onclick: () => { diff = id; draw(); } }, h('h4', null, `${d.ic} ${d.n}`), h('p', null, d.d)))),
+      h('p', { class: 'faint', style: { fontSize: '12px' } }, 'Explorer and Standard open with a guided tour of the star chart and your first colony (you can skip it).'),
       h('div', { class: 'sect' }, 'Modifiers (optional)'),
       h('div', { class: 'opt-grid' }, Object.entries(MODIFIERS).map(([id, m]) => h('button', { class: 'opt' + (mods.has(id) ? ' on' : ''), onclick: () => { if (mods.has(id)) mods.delete(id); else mods.add(id); draw(); } }, h('h4', null, `${m.ic} ${m.n}`), h('p', null, m.d)))),
       h('div', { class: 'sect' }, 'Star chart seed'),
@@ -67,7 +71,9 @@ export function clanSelect(root, { title, onStart, onBack, startLabel = 'Sign tr
         onclick: () => { picked = on ? picked.filter((x) => x !== id) : max === 1 ? [id] : picked.length < max ? picked.concat(id) : picked; draw(); },
       }, h('div', { class: 'row' }, h('span', { class: 'ic' }, c.ic), h('h3', { class: 'grow' }, c.n), on ? h('b', null, '✓') : null),
       h('div', { class: 'faint', style: { fontSize: '11px' } }, c.s, ' · starter: ', CARDS[STARTERS[id]].n),
-      h('p', null, c.d)));
+      h('p', null, c.d),
+      h('p', { class: 'play' }, h('b', null, 'Plays: '), c.play),
+      h('p', { class: 'faint' }, '🔗 Synergy with ', allies(id).map((a) => `${CLANS[a].ic} ${CLANS[a].n.split(' ')[0]}`).join(', '))));
     }
     startBtn.disabled = picked.length < min;
     startBtn.textContent = picked.length >= min ? startLabel : `Pick ${min - picked.length} more`;
@@ -111,7 +117,7 @@ export function codexScreen(root, { onBack }) {
     }
     const cards = CARD_LIST.filter((c) => c.cl === clan);
     const tot = cards.reduce((s, c) => s + rubric(c).pp, 0);
-    body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, CLANS[clan].d, ` Total rubric power ${tot.toFixed(0)} PP.`));
+    body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, CLANS[clan].d, ' ', CLANS[clan].play, ` Total rubric power ${tot.toFixed(0)} PP.`));
     for (const t of ['E', 'M', 'A']) {
       body.append(h('div', { class: 'sect' }, `${TIER[t]} tier`));
       body.append(h('div', { class: 'list' }, cards.filter((c) => c.t === t).map((c) => {
@@ -143,7 +149,7 @@ function rubricView(body) {
       h('b', null, 'Utility'), h('span', null, 'Token created 2 · enabling transform 1 · reveal 1.5 · cavern 2 · stabilize/shield 1 · repeat ≈5 · card draw 3 · Integrity 3')),
     h('div', { class: 'sect' }, 'Rarity bands'),
     h('div', { class: 'list' }, Object.entries(BANDS).map(([k, b]) => h('div', { class: 'item' }, h('b', { class: 'pill-' + k }, RARITY[k].n), ` ${b.min}–${b.max} PP (target ${b.target}) · draw weight ×${RARITY[k].w}`))),
-    h('p', { class: 'dim' }, 'Each clan has 7 Common, 5 Uncommon and 3 Rare buildings. Rarer cards are stronger on the rubric but drawn less often, so every clan\'s expected power per draw stays even. The headless simulator (tools/sim.mjs) plays every three-clan trio with a greedy bot; each card shows its rubric PP and its measured PP from those games. Full tables: docs/BALANCE.md.'));
+    h('p', { class: 'dim' }, 'Each clan has 8 Common, 6 Uncommon and 3 Rare buildings, including two 🔗 synergy cards that feed on other clans\' resources. Rarer cards are stronger on the rubric but drawn less often, so every clan\'s expected power per draw stays even. The headless simulator (tools/sim.mjs) plays every three-clan trio with a greedy bot; each card shows its rubric PP and its measured PP from those games. Full tables: docs/BALANCE.md.'));
   const rows = CLAN_IDS.map((cl) => {
     const cs = CARD_LIST.filter((c) => c.cl === cl);
     const tot = cs.reduce((s, c) => s + rubric(c).pp, 0);
@@ -172,6 +178,9 @@ export function helpScreen(root, { onBack }) {
       h('h3', null, 'Charters and the trade network'),
       P('A secured colony becomes a trade node. Choose a charter: its shipment grows with the world\'s abundance and two stamps – Specialize (a resource milestone) and Integrate (every active clan connected to the ★ Charter Beacon).'),
       P('Build lanes between claimed colonies, the Arkship and visited Freeports. Supplied colonies ship their route yield on every jump, limited by each lane\'s capacity. Three colonies of different charters joined in a loop form a trade ring and earn a Trade Compact. After Frontier Pressure 4, route crises are forecast a jump ahead: avert them, or fit lane upgrades that deflect them.'),
+      h('h3', null, 'The Exchange and Marks'),
+      P('💠 Exchange Marks are the common currency. On the Network tab\'s Exchange you can buy or sell Credits, Alloys, Isotopes, Gene Archives and Star Data for Marks. Prices move on every jump like a stock market: each row grades the current price as a good or bad buy or sell, and the market wire announces news a jump before it moves a price. Every unit you trade nudges the price a little.'),
+      P('You always buy above and sell below the market price. Trade Strength narrows that gap and pays a Marks dividend on every jump. It comes from supplied network nodes (the Arkship, Freeports and Relay Rocks count double, Fault Worlds and Gate Shrines not at all), Free Trade Enclave charters, Trade Posts on any node, Fleet Yard uplinks and Trade Compacts. Docked at a Freeport or the Arkship, spreads are 4% tighter. After every colony you earn 3 Marks per point of Integrity left.'),
       h('h3', null, 'Spending world resources'),
       P('Clans tab: Presence, Favor and Bans bias your draws (one free Favor and Ban at the start and after every planet); Enhancements give each clan a visible head start. Foundry: shop-only blueprints. Fleet: one-shot Preparations for the next colony and permanent Fleet Yard upgrades. Goals: carry one sector contract at a time.'),
       h('h3', null, 'The finale'),

@@ -1,8 +1,10 @@
-// The 135 base buildings (15 per clan), the 18 Card Foundry blueprints and
+// The 153 base buildings (17 per clan: 15 originals plus two synergy cards that
+// draw on other clans' resources), the 18 Card Foundry blueprints and
 // the neutral Charter Beacon.
 //
 // Card fields
 //   id, n (name), cl (clan), t (tier E/M/A), r (rarity C/U/R), tags, text
+//   ally   synergy cards: the clan whose resources or events this card feeds on
 //   trig   main trigger: build | turn | every (+every:N) | sunlit | sunlit2 | shadow | event | passive
 //   build  On Build effect            run   periodic effect (also used by repeats)
 //   L      event listeners [{on, r, run}]; r = number | 'self' | 'map' | 'net' | 'orbit'
@@ -15,16 +17,17 @@
 //
 // Effects receive `a`, the engine API (see colony.js mkApi).
 
+// d: what the clan works with; play: how it plays differently from the others.
 export const CLANS = {
-  iron: { n: 'Ironwake Union', s: 'Excavators', col: '#d98b45', ic: '⛏️', d: 'Ore, Caverns, Alloy and Anchors. Take a deposit\'s value now or keep it for later. Mine tunnels: Ironwake buildings on or beside a Cavern connect to every other building on or beside a Cavern.' },
-  helio: { n: 'Heliarch Array', s: 'Sunforged', col: '#f4c84a', ic: '☀️', d: 'Sunlight, Heat and Power. Build for the next light phase, not only this turn.' },
-  cryo: { n: 'Cryostead Enclave', s: 'Frostkeepers', col: '#79d0f2', ic: '❄️', d: 'Ice and Water cycles, Shadow and Cold. Consume Ice now or keep it as a recurring source. Ice bridges: Cryostead buildings connect to any building touching the same Ice or Water.' },
-  verd: { n: 'Verdant Exodus', s: 'Terraformers', col: '#6fcf73', ic: '🌱', d: 'Bio-Loam, Biomass, Pressure and growth chains.' },
-  syn: { n: 'Synapse Circuit', s: 'Machine Minds', col: '#a68cff', ic: '🧠', d: 'Signals, networks and repeat activations that make other buildings stronger.' },
-  wreck: { n: 'Wreckborn Fleet', s: 'Reclaimers', col: '#e5765b', ic: '♻️', d: 'Scrap, salvage and demolition. Sometimes tearing down pays more than keeping.' },
-  kep: { n: 'Kepler Cartographers', s: 'Orbitwrights', col: '#8ea6ff', ic: '🛰️', d: 'Orbit slots, Cargo launches and arrivals, long-range links.' },
-  hearth: { n: 'Hearthline Compact', s: 'Colonists', col: '#f59fc0', ic: '🏠', d: 'Habitats, Pressure, culture and cross-clan cooperation.' },
-  umbra: { n: 'Umbra Institute', s: 'Anomaly Researchers', col: '#d36bd6', ic: '🔮', d: 'Radiation, anomalies, time and rule-bending repeats.' },
+  iron: { n: 'Ironwake Union', s: 'Excavators', col: '#d98b45', ic: '⛏️', d: 'Ore, Gold, Caverns, Alloy and Anchors. Mine tunnels link buildings beside Caverns.', play: 'Digs its own board: excavate and mine for big early bursts, then refine Metal into Alloy.' },
+  helio: { n: 'Heliarch Array', s: 'Sunforged', col: '#f4c84a', ic: '☀️', d: 'Sunlight, Heat and Power: collectors, mirrors, furnaces and stored Charges.', play: 'Follows the sun, not the map: place for the next light phase and bank Charges for the dark.' },
+  cryo: { n: 'Cryostead Enclave', s: 'Frostkeepers', col: '#79d0f2', ic: '❄️', d: 'Ice, Water, Shadow and Cold. Ice bridges link buildings sharing Ice or Water.', play: 'Runs loops: melt Ice to Water and freeze it back, so one deposit scores again and again.' },
+  verd: { n: 'Verdant Exodus', s: 'Terraformers', col: '#6fcf73', ic: '🌱', d: 'Bio-Loam, Seams, Biomass and Pressure, with root Links that boost Bio networks.', play: 'Slow start, big finish: each new Biomass feeds the next Bio building, so dense gardens snowball.' },
+  syn: { n: 'Synapse Circuit', s: 'Machine Minds', col: '#a68cff', ic: '🧠', d: 'Signals, Drones and Automation: Link relays, repeats and network-wide scoring.', play: 'Weak alone, great with anyone: it repeats other buildings, multiplying any engine you build.' },
+  wreck: { n: 'Wreckborn Fleet', s: 'Reclaimers', col: '#e5765b', ic: '♻️', d: 'Wreckage, Scrap, Fuel and demolition: salvage pays when things are used up or destroyed.', play: 'Turns waste into points: break, fuse and even demolish your own buildings for bursts.' },
+  kep: { n: 'Kepler Cartographers', s: 'Orbitwrights', col: '#8ea6ff', ic: '🛰️', d: 'Orbital slots, Cargo launches and arrivals, tether Links and asteroid rotation.', play: 'Builds a second board in orbit: launch Cargo from the ground and score on every arrival.' },
+  hearth: { n: 'Hearthline Compact', s: 'Colonists', col: '#f59fc0', ic: '🏠', d: 'Habitats, Pressure and Culture, with rewards for mixing clans.', play: 'Scores from neighbours, not deposits: pack Pressurized Habitats and connect all your clans.' },
+  umbra: { n: 'Umbra Institute', s: 'Anomaly Researchers', col: '#d36bd6', ic: '🔮', d: 'Radiation, Anomalies, Crystals and Time-bending repeats.', play: 'High risk, high reward: radiation fuels big repeats but can cost Integrity, so place with care.' },
 };
 export const CLAN_IDS = Object.keys(CLANS);
 
@@ -261,6 +264,27 @@ const list = [
     rb: { once: 26, p: 9.5, rel: 0.23, u: 2, cost: 5, why: 'Huge burst paid for with Integrity.' },
   },
 
+  // ---- Ironwake synergy: Wreckborn salvage and Heliarch heat
+  {
+    id: 'scrapline_crusher', n: 'Scrapline Crusher', cl: 'iron', ally: 'wreck', t: 'E', r: 'C', tags: ['Mining', 'Industry'], trig: 'every', every: 2, pts: 5,
+    text: 'Every 2 turns: Crush a Scrap or one unit of Wreckage within range 2 into Metal, +5 (+2 more for Wreckage); with none, +1 per Metal within range 2 (max 2). Reactive: When Scrap appears within range 2, +2.',
+    L: [{ on: 'create', r: 2, run(a, b, ev) { if (ev.res === 'Scrap') a.score(2); } }],
+    run(a) {
+      const k = firstRes(a, ['Scrap', 'Wreck'], 2);
+      if (!k) { const n = resCount(a, 'Metal', 2, 2); if (n) a.score(n); return; }
+      const was = a.res(k);
+      if (a.transform(k, 'Metal')) a.score(5 + (was === 'Wreck' ? 2 : 0));
+    },
+    rb: { p: 3.5, rel: 0.6, u: 0.6, react: { p: 2, rate: 0.15 }, why: 'Wreckborn synergy: Scrap and Wreckage become Metal for the Ironwake refinery.' },
+  },
+  {
+    id: 'thermite_bore', n: 'Thermite Bore', cl: 'iron', ally: 'helio', t: 'M', r: 'U', tags: ['Mining', 'Heat'], trig: 'every', every: 2, pts: 2,
+    text: 'Reactive: When a hex within range 3 becomes Hot, extract one unit of an Ore or Gold deposit within range 2 into Metal, +9; with nothing to extract, +3. Every 2 turns: +2 per Hot hex or other Heat building within range 2 (max 2).',
+    L: [{ on: 'heat', r: 3, run(a) { if (convert(a, ['Ore', 'Gold'], 'Metal', a.R(2))) a.score(9); else a.score(3); } }],
+    run(a) { const n = Math.min(2, a.near(a.k, 2).concat([a.k]).filter((k) => a.st(k, 'Hot')).length + countNear(a, 'Heat', 2, 2)); if (n) a.score(2 * n); },
+    rb: { p: 3, rel: 0.55, u: 1, react: { p: 8, rate: 0.3 }, why: 'Heliarch synergy: every Heat source nearby becomes a drill shift.' },
+  },
+
   // ======================= HELIARCH ARRAY =======================
   {
     id: 'sunfoil_canopy', n: 'Sunfoil Canopy', cl: 'helio', t: 'E', r: 'C', tags: ['Solar', 'Power'], trig: 'sunlit', pts: 2,
@@ -392,6 +416,22 @@ const list = [
     rb: { react: { p: 7, rate: 0.77 }, u: 2, why: 'Doubles the best Solar cards nearby.' },
   },
 
+  // ---- Heliarch synergy: Cryostead ice and Synapse signals
+  {
+    id: 'glacier_mirror', n: 'Glacier Mirror', cl: 'helio', ally: 'cryo', t: 'E', r: 'C', tags: ['Light', 'Solar'], trig: 'sunlit', pts: 2,
+    text: 'Every Sunlit turn: +1 per Ice or Water within range 2 (max 3). Reactive: When Ice melts within range 2, +2.',
+    L: [{ on: 'melt', r: 2, run(a) { a.score(2); } }],
+    run(a) { const n = resCount(a, ['Ice', 'Water'], 2, 3); if (n) a.score(n); },
+    rb: { p: 2, rel: 0.85, react: { p: 2, rate: 0.35 }, why: 'Cryostead synergy: ice fields focus the light it collects.' },
+  },
+  {
+    id: 'heliograph_array', n: 'Heliograph Array', cl: 'helio', ally: 'syn', t: 'M', r: 'U', tags: ['Light', 'Solar'], trig: 'sunlit', pts: 3,
+    text: 'Every Sunlit turn: Repeat a Signal or Drone building within range 2, +4; with none, +3. Reactive: When a building within range 2 is repeated, +2.',
+    L: [{ on: 'repeat', r: 2, run(a) { a.score(2); } }],
+    run(a) { a.score(repeatOne(a, (b, c) => c.tags.includes('Signal') || c.tags.includes('Drone'), 2) ? 4 : 3); },
+    rb: { p: 3.5, rel: 0.95, u: 2, react: { p: 2, rate: 0.25 }, why: 'Synapse synergy: sunlight drives the signal network.' },
+  },
+
   // ======================= CRYOSTEAD ENCLAVE =======================
   {
     id: 'ice_harvester', n: 'Ice Harvester', cl: 'cryo', t: 'E', r: 'C', tags: ['Ice', 'Extraction'], trig: 'every', every: 2, pts: 6,
@@ -519,6 +559,22 @@ const list = [
     }],
     run(a) { const n = resCount(a, ['Ice', 'Water'], 2, 3); if (n) a.score(3 * n); },
     rb: { react: { p: 7, rate: 0.41 }, u: 1.5, rel: 0.56, why: 'Freeze–melt capstone; cap 3 keeps loops bounded.' },
+  },
+
+  // ---- Cryostead synergy: Verdant biomass and Hearthline pressure
+  {
+    id: 'dew_cistern', n: 'Dew Cistern', cl: 'cryo', ally: 'verd', t: 'E', r: 'C', tags: ['Water', 'Storage'], trig: 'turn', pts: 1,
+    text: 'Reactive: When Biomass appears within range 2, condense a Water beside this, +3. Every turn: +1 per Water or Biomass within range 2 (max 2).',
+    L: [{ on: 'create', r: 2, run(a, b, ev) { if (ev.res === 'Biomass') { a.create('Water', a.k, 1); a.score(3); } } }],
+    run(a) { const n = resCount(a, ['Water', 'Biomass'], 2, 2); if (n) a.score(n); },
+    rb: { p: 1.2, rel: 0.6, react: { p: 3, rate: 0.25 }, u2: 2, why: 'Verdant synergy: transpiring gardens refill the water cycle.' },
+  },
+  {
+    id: 'habitat_cold_store', n: 'Habitat Cold Store', cl: 'cryo', ally: 'hearth', t: 'M', r: 'U', tags: ['Cold', 'Storage'], trig: 'turn', pts: 2,
+    text: 'Every turn: +2 per Pressurized hex within range 1 (max 2). Reactive: When Water on a Pressurized hex within range 2 is consumed, +5.',
+    L: [{ on: 'consume', r: 2, run(a, b, ev) { if (ev.res === 'Water' && a.st(ev.k, 'Pressure')) a.score(5); } }],
+    run(a) { const n = Math.min(2, a.near(a.k, 1).concat([a.k]).filter((k) => a.st(k, 'Pressure')).length); if (n) a.score(2 * n); },
+    rb: { p: 3, rel: 0.7, react: { p: 5, rate: 0.2 }, why: 'Hearthline synergy: pressurized domes make the best cold storage.' },
   },
 
   // ======================= VERDANT EXODUS =======================
@@ -674,6 +730,32 @@ const list = [
     rb: { react: { p: 8, rate: 0.47 }, u: 2, rel: 0.8, why: 'Bio repeat capstone.' },
   },
 
+  // ---- Verdant synergy: Umbra anomalies and Ironwake caverns
+  {
+    id: 'mutagen_bed', n: 'Mutagen Bed', cl: 'verd', ally: 'umbra', t: 'E', r: 'C', tags: ['Bio', 'Growth'], trig: 'every', every: 2, pts: 5,
+    text: 'Every 2 turns: Grow a Biomass beside an Anomaly within range 2, +5; without one, +1 per Bio token or Radiated hex within range 2 (max 4).',
+    run(a) {
+      for (const k of a.resNear(a.k, 'Anomaly', 2)) if (a.create('Biomass', k, 1)) return a.score(5);
+      const n = Math.min(4, a.resNear(a.k, '#Bio', 2).length + radiated(a, 2));
+      if (n) a.score(n);
+    },
+    rb: { p: 3.5, rel: 0.75, u: 0.5, why: 'Umbra synergy: anomalies mutate seed stock into fast growth.' },
+  },
+  {
+    id: 'deepcave_mycelium', n: 'Deepcave Mycelium', cl: 'verd', ally: 'iron', t: 'M', r: 'U', tags: ['Bio', 'Soil'], trig: 'every', every: 2, pts: 3,
+    text: 'Reactive: When a Cavern is excavated within range 2, seed an Organic Seam in it, +6. Every 2 turns: +4 per Cavern within range 2 holding Organic matter or a Bio building (max 3).',
+    L: [{ on: 'excavate', r: 2, run(a, b, ev) { a.createAt('Seam', ev.k); a.score(6); } }],
+    run(a) {
+      const n = Math.min(3, a.near(a.k, 2).concat([a.k]).filter((k) => {
+        if (a.kind(k) !== 'cavern') return false;
+        const r = a.res(k), x = a.bldAt(k);
+        return (r && a.is(r, '#Organic')) || (x && a.has(x, 'Bio'));
+      }).length);
+      if (n) a.score(4 * n);
+    },
+    rb: { p: 5, rel: 0.55, react: { p: 6, rate: 0.25 }, u2: 2, why: 'Ironwake synergy: fresh caverns become fungal gardens.' },
+  },
+
   // ======================= SYNAPSE CIRCUIT =======================
   {
     id: 'relay_pylon', n: 'Relay Pylon', cl: 'syn', t: 'E', r: 'C', tags: ['Signal', 'Link'], trig: 'every', every: 2, pts: 2,
@@ -807,6 +889,27 @@ const list = [
     rb: { react: { p: 7, rate: 0.59 }, u: 2, why: 'Payoff for already-repeating networks.' },
   },
 
+  // ---- Synapse synergy: Hearthline habitats and Wreckborn salvage
+  {
+    id: 'census_relay', n: 'Census Relay', cl: 'syn', ally: 'hearth', t: 'E', r: 'C', tags: ['Signal', 'Data'], trig: 'every', every: 2, pts: 2,
+    text: 'Every 2 turns: Repeat a Habitat within range 2, +2; with none, +2 anyway.',
+    run(a) { repeatOne(a, 'Habitat', 2); a.score(2); },
+    rb: { p: 2, rel: 1, u: 1.75, why: 'Hearthline synergy: counts the colonists and runs their homes twice.' },
+  },
+  {
+    id: 'scrapper_swarm', n: 'Scrapper Swarm', cl: 'syn', ally: 'wreck', t: 'M', r: 'U', tags: ['Drone', 'Automation'], trig: 'every', every: 2, pts: 2,
+    text: 'Reactive: When Scrap or Wreckage within range 2 is consumed, +5; the first time each turn, also repeat a different Drone or Automation building within range 2. Every 2 turns: +2 per Scrap or Drone building within range 2 (max 3).',
+    L: [{
+      on: 'consume', r: 2, run(a, b, ev) {
+        if (!a.is(ev.res, '#Scrap')) return;
+        a.score(5);
+        if (a.once('ss')) repeatOne(a, (x, c) => c.tags.includes('Drone') || c.tags.includes('Automation'), 2);
+      },
+    }],
+    run(a) { const n = Math.min(3, a.resNear(a.k, 'Scrap', 2).length + countNear(a, 'Drone', 2, 3)); if (n) a.score(2 * n); },
+    rb: { p: 3, rel: 0.6, react: { p: 5, rate: 0.25 }, u2: 2.5, why: 'Wreckborn synergy: drones swarm every salvage job.' },
+  },
+
   // ======================= WRECKBORN FLEET =======================
   {
     id: 'scrap_picker', n: 'Scrap Picker', cl: 'wreck', t: 'E', r: 'C', tags: ['Salvage', 'Scrap'], trig: 'event', pts: 4,
@@ -937,6 +1040,26 @@ const list = [
     L: [{ on: 'destroy', r: 2, run(a, b, ev) { if (ev.card !== 'beacon' && a.once('px')) { a.toHand(ev.card); a.score(10); } } }],
     run(a) { const n = countNear(a, null, 1, 3); if (n) a.score(6 * n); },
     rb: { p: 12, rel: 0.52, react: { p: 10, rate: 0.09 }, u: 6, why: 'Card recursion.' },
+  },
+
+  // ---- Wreckborn synergy: Kepler launches and Umbra radiation
+  {
+    id: 'jetsam_collector', n: 'Jetsam Collector', cl: 'wreck', ally: 'kep', t: 'E', r: 'C', tags: ['Salvage', 'Cargo'], trig: 'every', every: 2, pts: 1,
+    text: 'Reactive: When a resource is launched into orbit within range 2, catch the debris: drop a Scrap beside this, +3. Every 2 turns: +1 per Scrap within range 2 (max 2).',
+    L: [{ on: 'launch', r: 2, run(a) { a.create('Scrap', a.k, 1); a.score(3); } }],
+    run(a) { const n = resCount(a, 'Scrap', 2, 2); if (n) a.score(n); },
+    rb: { p: 1.5, rel: 0.6, react: { p: 3, rate: 0.25 }, u2: 2, why: 'Kepler synergy: every launch sheds salvage.' },
+  },
+  {
+    id: 'rift_scavenger', n: 'Rift Scavenger', cl: 'wreck', ally: 'umbra', t: 'M', r: 'U', tags: ['Salvage', 'Exotic'], trig: 'every', every: 2, pts: 9,
+    text: 'Every 2 turns: Strip one unit of an Anomaly within range 2 into Scrap, +12; with none, +2 per Scrap or Wreckage within range 2 (max 3). Reactive: When Radiation appears within range 2, scrub it and drop a Scrap beside it, +5.',
+    L: [{ on: 'radiation', r: 2, run(a, b, ev) { a.rmSt(ev.k, 'Radiation'); a.create('Scrap', ev.k, 1); a.score(5); } }],
+    run(a) {
+      if (convert(a, 'Anomaly', 'Scrap', 2)) return a.score(12);
+      const n = resCount(a, ['Scrap', 'Wreck'], 2, 3);
+      if (n) a.score(2 * n);
+    },
+    rb: { p: 6, rel: 0.55, u: 1, react: { p: 5, rate: 0.2 }, u2: 2, why: 'Umbra synergy: exotic hazards are just more salvage.' },
   },
 
   // ======================= KEPLER CARTOGRAPHERS =======================
@@ -1076,6 +1199,22 @@ const list = [
     rb: { p: 6, ability: { p: 4.94, u: 6 }, rel: 0.41, why: 'Turns meteors into targeted resource drops.' },
   },
 
+  // ---- Kepler synergy: Ironwake metal and Cryostead ice
+  {
+    id: 'ore_catapult', n: 'Ore Catapult', cl: 'kep', ally: 'iron', t: 'E', r: 'C', tags: ['Orbital', 'Cargo'], trig: 'every', every: 2, pts: 5,
+    text: 'Every 2 turns: Launch a Metal, Scrap or Alloy within range 2 into orbit, +5; with nothing to launch, +2. Reactive: When Ore or Gold is extracted within range 2, +3.',
+    L: [{ on: 'extract', r: 2, run(a) { a.score(3); } }],
+    run(a) { const k = firstRes(a, metalLoose, 2); a.score(k && a.launch(k) ? 5 : 2); },
+    rb: { p: 3, rel: 0.6, u: 0.8, react: { p: 3, rate: 0.2 }, why: 'Ironwake synergy: the mine output goes straight up the rail.' },
+  },
+  {
+    id: 'comet_tender', n: 'Comet Tender', cl: 'kep', ally: 'cryo', t: 'M', r: 'U', tags: ['Orbital', 'Ice'], trig: 'every', every: 2, pts: 7,
+    text: 'Every 2 turns: Launch an Ice or Water within range 2 into orbit, +8. Reactive: When Ice melts within range 2, +3.',
+    L: [{ on: 'melt', r: 2, run(a) { a.score(3); } }],
+    run(a) { const k = firstRes(a, ['Ice', 'Water'], 2); if (k && a.launch(k)) a.score(8); },
+    rb: { p: 8, rel: 0.4, u: 1, react: { p: 3, rate: 0.3 }, why: 'Cryostead synergy: water is the most valuable cargo in space.' },
+  },
+
   // ======================= HEARTHLINE COMPACT =======================
   {
     id: 'pressure_dome', n: 'Pressure Dome', cl: 'hearth', t: 'E', r: 'C', tags: ['Habitat', 'Pressure'], trig: 'turn', pts: 1,
@@ -1210,6 +1349,28 @@ const list = [
       if (s.size >= 3) a.score(10); else if (s.size) a.score(2 * s.size);
     },
     rb: { p: 6, u: 1, rel: 0.99, why: 'Cooperation capstone with Integrity insurance.' },
+  },
+
+  // ---- Hearthline synergy: Kepler arrivals and Verdant biomass
+  {
+    id: 'welcome_hall', n: 'Welcome Hall', cl: 'hearth', ally: 'kep', t: 'E', r: 'C', tags: ['Habitat', 'Trade'], trig: 'every', every: 2, pts: 2,
+    text: 'Reactive: When Cargo arrives in orbit anywhere, unpack it: create a Water or a Biomass (alternating) beside this, +3. Every 2 turns: +2 per adjacent Habitat (max 2), min +1.',
+    L: [{ on: 'arrival', r: 'map', run(a) { const m = a.mem(); m.alt = !m.alt; a.create(m.alt ? 'Water' : 'Biomass', a.k, 1); a.score(3); } }],
+    run(a) { a.score(Math.max(1, 2 * countNear(a, 'Habitat', 1, 2))); },
+    rb: { p: 2.4, rel: 1, react: { p: 3, rate: 0.2 }, u2: 1.5, why: 'Kepler synergy: every shipment feeds the colony.' },
+  },
+  {
+    id: 'greenhouse_refectory', n: 'Greenhouse Refectory', cl: 'hearth', ally: 'verd', t: 'M', r: 'U', tags: ['Habitat', 'Culture'], trig: 'turn', pts: 1,
+    text: 'On Build: Pressurize this and adjacent hexes, +2. Every turn: +1 per adjacent Habitat (max 3), min +1. Every 2 turns: also serve a Biomass within range 2 for +5 per adjacent Habitat (max 3), min +5.',
+    build(a) { pressurize(a, [a.k, ...a.near(a.k, 1)]); a.score(2); },
+    run(a) {
+      const hab = Math.max(1, countNear(a, 'Habitat', 1, 3));
+      a.score(hab);
+      if (a.turn % 2) return;
+      const k = firstRes(a, 'Biomass', 2);
+      if (k && a.consume(k)) a.score(5 * hab);
+    },
+    rb: { once: 6, p: 2.5, rel: 1, u: 0.3, why: 'Verdant synergy: the gardens feed the commons.' },
   },
 
   // ======================= UMBRA INSTITUTE =======================
@@ -1355,6 +1516,27 @@ const list = [
       if (n) { a.score(3 * n); a.addSt(a.k, 'Radiation'); }
     },
     rb: { p: 7, u: 4, rel: 1.6, cost: 1, why: 'Mass repeat that seeds its own variety; the most explosive Umbra card.' },
+  },
+
+  // ---- Umbra synergy: Heliarch heat and Synapse repeats
+  {
+    id: 'heatwell_rift', n: 'Heatwell Rift', cl: 'umbra', ally: 'helio', t: 'E', r: 'C', tags: ['Exotic', 'Time'], trig: 'every', every: 2, pts: 3, cap: 3,
+    text: 'Reactive: When a hex within range 2 becomes Hot, +4 (up to 3 times per turn). Every 2 turns: flip a Hot hex within range 2 to Cold, +3 (triggers Cooling); with none, +1.',
+    L: [{ on: 'heat', r: 2, run(a) { a.score(4); } }],
+    run(a) { const k = a.near(a.k, 2).concat([a.k]).filter((k) => a.st(k, 'Hot'))[0]; if (k) { a.addSt(k, 'Cold'); a.score(3); } else a.score(1); },
+    rb: { p: 1.6, rel: 1, u: 0.3, react: { p: 4, rate: 0.25 }, why: 'Heliarch synergy: heat pooling in a rift folds back into cold.' },
+  },
+  {
+    id: 'resonance_well', n: 'Resonance Well', cl: 'umbra', ally: 'syn', t: 'M', r: 'U', tags: ['Exotic', 'Signal'], trig: 'every', every: 2, pts: 2,
+    text: 'Reactive: When a building within range 2 is repeated, +2; the first time each turn, irradiate an adjacent empty hex. Every 2 turns: +2 per Signal building within range 2 (max 3).',
+    L: [{
+      on: 'repeat', r: 2, run(a) {
+        a.score(2);
+        if (a.once('rw')) { const k = a.near(a.k, 1).find((x) => a.free(x) && !a.st(x, 'Radiation')); if (k) a.addSt(k, 'Radiation'); }
+      },
+    }],
+    run(a) { const n = countNear(a, 'Signal', 2, 3); if (n) a.score(2 * n); },
+    rb: { p: 4, rel: 0.6, react: { p: 2, rate: 1 }, u2: 0.5, why: 'Synapse synergy: every echo rings the well.' },
   },
 ];
 

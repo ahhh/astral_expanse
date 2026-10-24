@@ -16,8 +16,8 @@ import { isUnlocked, unlockText } from './progress.js';
 export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, onPractice, onCodex, onHelp, onStats }) {
   root.innerHTML = '';
   root.append(h('div', { class: 'title' },
-    h('div', { class: 'planet' }),
     h('div', { class: 'logo' }, 'Astral Expanse', h('small', null, 'The Far Trade')),
+    h('div', { class: 'grow' }),
     h('p', null, 'Set out with a single clan, build self-activating colonies on strange asteroids, win new clans at their Enclaves, weave a trade network and reach a mythic superplanet before the frontier closes.'),
     hasSave ? h('button', { class: 'btn primary block', onclick: onContinue }, `Continue – ${saveInfo}`) : null,
     h('button', { class: 'btn block' + (hasSave ? '' : ' primary'), onclick: onNew }, '🚀 New expedition'),

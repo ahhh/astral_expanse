@@ -828,6 +828,23 @@ export function scrapCard(S, handIdx) {
   return true;
 }
 
+// Hints: the first on each map is free; after that 1 Integrity buys a pack of 2.
+export const HINT_PACK = 2;
+export const hintsLeft = (S) => (S.hints == null ? 1 : S.hints);
+export function useHint(S) {
+  if (hintsLeft(S) <= 0) return false;
+  S.hints = hintsLeft(S) - 1;
+  S.hintsUsed = (S.hintsUsed || 0) + 1;
+  return true;
+}
+export function buyHints(S) {
+  if (S.status !== 'play' || S.integrity <= 1) return false;
+  S.integrity -= 1;
+  S.hints = hintsLeft(S) + HINT_PACK;
+  note(S, `−1 Integrity: bought ${HINT_PACK} hints`);
+  return true;
+}
+
 export function abilityState(S, b) {
   const ab = card(b).ability;
   if (!ab) return null;

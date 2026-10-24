@@ -1,5 +1,5 @@
 // Colony map screen: HUD, SVG hex map, hand tray and info sheets.
-import { h, s, sheet, toast, confirmSheet, closeSheets } from './dom.js';
+import { h, s, sheet, toast, confirmSheet, closeSheets, withTip } from './dom.js';
 import { cardEl, cardText, clanColor, abbr, trigLabel } from './cardview.js';
 import { CARDS, CLANS, RARITY, TIER } from '../engine/cards.js';
 import { RES, STATUS, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
@@ -8,6 +8,7 @@ import {
   isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, scrapCard, bldAt, bldList, network, links, beaconLinked, BEACON_BONUS,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
   SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone, cpGain, masterworkNeed,
+  hintsLeft, useHint, buyHints, HINT_PACK,
 } from '../engine/colony.js';
 import { bestMove } from '../engine/ai.js';
 import { buildingTile, resourceTile, mapBackdrop, MAP_FALLBACK, isMissing, markMissing } from './art.js';
@@ -337,7 +338,7 @@ export function colonyScreen(root, S, hooks) {
     actEl.append(
       h('button', { class: 'btn', onclick: logSheet }, '📜 Log'),
       h('button', { class: 'btn', onclick: goals, 'data-tut': 'goals' }, '🎯 Goals'),
-      h('button', { class: 'btn', disabled: busy, onclick: hint, 'data-tut': 'hint' }, '💡 Hint'),
+      h('button', { class: 'btn', disabled: busy, onclick: hint, 'data-tut': 'hint', title: hintsLeft(S) ? `${hintsLeft(S)} hint${hintsLeft(S) > 1 ? 's' : ''} left` : `1 Integrity buys ${HINT_PACK} hints` }, '💡 Hint', h('span', { class: 'faint' }, hintsLeft(S) ? ` ${hintsLeft(S)}` : ' ❤️')),
       hooks.undo ? h('button', { class: 'btn', disabled: busy || undoLeft() <= 0, onclick: undo, title: 'Rewind your last placement or pass' }, '↶ Undo') : null,
       h('button', { class: 'btn', disabled: busy || sel == null || S.scrapped, onclick: scrap, title: 'Scrap the selected card for +1 Influence (once per turn)' }, '🗑 Scrap'),
       h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; snap = { state: clone(S), turn }; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
@@ -704,8 +705,25 @@ export function colonyScreen(root, S, hooks) {
 
   function hint() {
     closeSummary();
+    if (hintsLeft(S) > 0) return showHint();
+    const integrity = withTip(h('b', { class: 'term' }, 'Integrity'), [h('b', null, '❤️ Integrity'),
+      'The structural health of this asteroid. Missed checkpoints, meteors and collapses chip it away; at 0 the asteroid fractures and the colony is lost. Every point left when the map ends pays out 💠 Exchange Marks.']);
+    const can = S.integrity > 1;
+    sheet({
+      title: '💡 Buy more hints?',
+      body: h('div', null,
+        h('p', null, `Your free hint for this map is spent. Hints draw on the colony's survey crews: spend 1 `, integrity, ` to unlock ${HINT_PACK} more.`),
+        h('p', { class: can ? 'dim' : 'bad' }, can ? `❤️ ${S.integrity} → ${S.integrity - 1}` : 'Your asteroid cannot spare any more Integrity.')),
+      actions: [{ label: 'Cancel' }, { label: `Spend ❤️1 for ${HINT_PACK} hints`, cls: 'primary', disabled: !can, on: () => { if (buyHints(S)) { hooks.save(); showHint(); } } }],
+    });
+  }
+
+  function showHint() {
     const m = bestMove(S, { look: 2, maxHexes: 30 });
     if (!m) return toast('No legal placements – pass the turn.');
+    useHint(S);
+    if (hooks.onHint) hooks.onHint();
+    hooks.save();
     sel = m.i;
     fc = null;
     render();

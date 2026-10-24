@@ -9,10 +9,12 @@ import { genColony } from './engine/mapgen.js';
 import { resetTurnState } from './engine/colony.js';
 import * as X from './engine/expedition.js';
 import { CLANS } from './engine/cards.js';
+import { normalizeMeta, recordExpedition, recordStart } from './ui/progress.js';
+import { statsCardSheet } from './ui/statsCard.js';
 
 const root = document.getElementById('app');
 const app = { E: null, practice: null, tab: 'chart', back: null };
-let meta = loadMeta();
+const meta = normalizeMeta(loadMeta());
 
 function revive(S) {
   if (S) S._q = [];
@@ -22,6 +24,7 @@ function save() {
   if (app.E) writeSave({ kind: 'exp', E: app.E });
   else if (app.practice) writeSave({ kind: 'practice', S: app.practice });
 }
+const statsCard = () => statsCardSheet(meta, () => writeMeta(meta));
 function bumpMeta(S) {
   if (S && S.influence > (meta.bestColony || 0)) { meta.bestColony = S.influence; writeMeta(meta); }
 }
@@ -35,13 +38,13 @@ function title() {
   if (s && s.kind === 'exp') info = `${s.E.clans.map((c) => CLANS[c].ic).join('')} expedition, ${s.E.claimed} claimed`;
   if (s && s.kind === 'practice') info = `quick colony, turn ${s.S.turn}`;
   titleScreen(root, {
-    hasSave: !!s, saveInfo: info, meta,
+    hasSave: !!s, saveInfo: info, meta, onStats: statsCard,
     onContinue: () => {
       if (s.kind === 'exp') { app.E = X.migrate(s.E); if (app.E.colony) revive(app.E.colony); app.practice = null; route(); }
       else { app.practice = revive(s.S); app.E = null; route(); }
     },
     onNew: () => {
-      const go = () => setupScreen(root, { onBack: title, onNext: (opts) => clanSelect(root, {
+      const go = () => setupScreen(root, { meta, onBack: title, onNext: (opts) => clanSelect(root, {
         title: 'Founding clan', onBack: go, min: 1, max: 1, startLabel: 'Sign the founding treaty',
         hint: 'Choose one clan to found your expedition. Secure Clan Enclaves on the star chart to recruit up to two more.',
         onStart: (clans) => {
@@ -50,6 +53,7 @@ function title() {
           app.practice = null;
           app.tab = 'chart';
           meta.runs = (meta.runs || 0) + 1;
+          recordStart(meta, clans[0]);
           writeMeta(meta);
           save();
           route();
@@ -114,6 +118,7 @@ function colonyHooks(undo, onDone, abandon) {
     save, undo,
     onRender: (ctx) => { if (app.E && app.E.tut) tutorialColony(app.E, { ...ctx, save }); },
     onDone: () => { clearCoach(); bumpMeta(app.E ? app.E.colony : app.practice); save(); onDone(); },
+    onHint: () => { if (app.E) app.E.hintsUsed = (app.E.hintsUsed || 0) + 1; meta.hints++; writeMeta(meta); },
     codex: () => { app.back = route; codex(); },
     help: () => { app.back = route; help(); },
     quit: () => { save(); title(); },
@@ -122,10 +127,6 @@ function colonyHooks(undo, onDone, abandon) {
 }
 
 function afterMission() {
-  const E = app.E;
-  if (E.status !== 'active') {
-    if (E.status === 'won') { meta.wins = (meta.wins || 0) + 1; writeMeta(meta); }
-  }
   app.tab = 'chart';
   save();
   route();
@@ -160,13 +161,18 @@ function overworldMenu() {
 
 function expeditionEnd() {
   const E = app.E;
+  const unlocked = recordExpedition(meta, E);
+  writeMeta(meta);
+  save();
   root.innerHTML = '';
   const won = E.status === 'won';
   root.append(h('div', { class: 'page' },
     h('div', { class: 'big-result' }, h('div', { class: 'em' }, won ? '🌟' : '🌌'), h('h2', null, won ? E.ending || 'Victory' : 'Expedition over'), h('p', { class: 'dim' }, E.endReason || '')),
     h('div', { class: 'kv' }, h('b', null, 'Difficulty'), h('span', null, `${X.diffOf(E).ic} ${X.diffOf(E).n}`), h('b', null, 'Clans'), h('span', null, E.clans.map((c) => CLANS[c].ic).join(' ')), h('b', null, 'Colonies claimed'), h('span', null, E.claimed), h('b', null, 'Jumps'), h('span', null, E.jumps), h('b', null, 'Total Influence'), h('span', null, E.totalInfluence), h('b', null, 'Peak throughput'), h('span', null, E.peakThroughput || 0), h('b', null, 'Superplanets claimed'), h('span', null, E.victories || 0), h('b', null, 'Seed'), h('span', null, E.seedLabel || E.seed)),
+    unlocked.map((d) => h('div', { class: 'unlock-banner' }, `🔓 ${X.DIFFICULTY[d].ic} ${X.DIFFICULTY[d].n} difficulty unlocked!`)),
     h('div', { class: 'sect' }, 'Final purse'), resBar(E),
     won ? h('button', { class: 'btn primary block', style: { marginTop: '20px' }, onclick: () => { X.enterEndless(E); app.tab = 'chart'; save(); route(); toast('The Endless Frontier opens beyond the Crown'); } }, '♾️ Continue into the Endless Frontier') : null,
+    h('button', { class: 'btn block', style: { marginTop: '10px' }, onclick: statsCard }, '🖼 Share your stats card'),
     h('button', { class: 'btn block' + (won ? '' : ' primary'), style: { marginTop: '10px' }, onclick: () => { app.E = null; clearSave(); title(); } }, 'Back to title')));
 }
 

@@ -251,6 +251,7 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 /* ---------- tooltip */
 .tip { position: fixed; z-index: 50; max-width: 230px; padding: 7px 9px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); box-shadow: 0 6px 18px #0008; font-size: 12px; line-height: 1.35; pointer-events: none; }
 .tip b { display: block; margin-bottom: 2px; }
+.term { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 .res .chip { cursor: help; }
 .tag.ally { color: var(--accent); }
 
@@ -272,3 +273,6 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .coach-res div { margin-bottom: 3px; }
 .coach-skip { background: none; border: 0; padding: 4px 0; color: var(--faint); text-decoration: underline; cursor: pointer; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .coach-ring { transition: none; } .coach-bubble.enter { animation: none; } }
+.stats-card { display: block; width: 100%; max-width: 420px; height: auto; margin: 0 auto 10px; border-radius: 14px; box-shadow: 0 8px 28px #000a; }
+.opt.locked { opacity: .5; cursor: not-allowed; }
+.unlock-banner { margin: 14px 0 0; padding: 12px; text-align: center; font: 700 16px var(--head); color: var(--warn); border: 1px solid var(--warn); border-radius: var(--radius); background: #ffbf3c14; box-shadow: 0 0 18px #ffbf3c33; }

@@ -250,7 +250,7 @@ const STEPS = [
   },
   {
     where: 'colony', next: true, last: true, title: 'Stuck? Ask for a hint', target: () => $('hint'),
-    text: () => [P('💡 Hint highlights a strong move at any time, like the ones you just made. You can also tap a Rock hex to excavate it, or a building to demolish it, instead of building.'),
+    text: () => [P('💡 Hint highlights a strong move at any time, like the ones you just made. Your first hint on each map is free; after that, 1 Integrity buys 2 more. You can also tap a Rock hex to excavate it, or a building to demolish it, instead of building.'),
       P('That\'s the tour. Secure this world!')],
   },
 ];

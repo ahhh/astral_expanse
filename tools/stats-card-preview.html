@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- Dev preview of the shareable stats card at every rank. Serve the repo root
+     (python3 -m http.server) and open /tools/stats-card-preview.html; add
+     ?tier=N to show one card at full size (used for screenshots), ?clans=1
+     for one card per favourite founding clan, &clan=<id> to pick the clan. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stats card preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #0b0f1a; display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; }
+    canvas { width: 360px; height: auto; }
+    body.one { padding: 0; } body.one canvas { width: 1080px; }
+  </style>
+</head>
+<body>
+<script type="module">
+  import { renderStatsCard } from '../js/ui/statsCard.js';
+  import { normalizeMeta } from '../js/ui/progress.js';
+  const ladder = ['explorer', 'standard', 'veteran', 'nightmare'];
+  const params = new URLSearchParams(location.search);
+  const sample = (tier, clan = params.get('clan')) => normalizeMeta({
+    startClans: clan ? { [clan]: 3 } : {},
+    name: tier ? ['', 'Ada Vance', 'Cmdr. Okafor', 'Rook', 'Nyx Sable'][tier] : '',
+    runs: 2 + tier * 4, wins: tier ? tier + 1 : 0, bestColony: 120 + tier * 70,
+    cleared: Object.fromEntries(ladder.slice(0, tier).map((d, i) => [d, tier - i])),
+    endings: Object.fromEntries(['Survival Claim', 'Resonant Capital', 'Transcendent Civilization'].slice(0, tier >= 4 ? 3 : tier >= 2 ? 2 : tier).map((e) => [e, 1])),
+    clanWins: Object.fromEntries(['iron', 'helio', 'verd', 'umbra', 'syn', 'cryo', 'kep', 'wreck', 'hearth'].slice(0, tier * 2 + (tier ? 1 : 0)).map((c) => [c, 1])),
+    best: { total: 300 + tier * 260, claimed: 3 + tier * 2, throughput: 2 + tier * 3, victories: tier, endless: tier >= 3 ? tier - 2 : 0 },
+    lastWin: tier ? { difficulty: ladder[tier - 1], clans: ['iron', 'verd', 'umbra'], total: 300 + tier * 260, seed: 'Daily 2026-10-23' } : null,
+  });
+  const one = params.get('tier');
+  if (one != null) document.body.classList.add('one');
+  if (params.get('clans')) for (const [i, c] of ['iron', 'helio', 'cryo', 'verd', 'syn', 'wreck', 'kep', 'hearth', 'umbra'].entries()) document.body.append(await renderStatsCard(sample(i % 5, c)));
+  else for (const t of one != null ? [+one] : [0, 1, 2, 3, 4]) document.body.append(await renderStatsCard(sample(t)));
+  document.title = 'ready';
+</script>
+</body>
+</html>

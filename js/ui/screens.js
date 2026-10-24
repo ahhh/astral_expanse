@@ -11,8 +11,9 @@ import { DIFFICULTY, MODIFIERS } from '../engine/expedition.js';
 import { TECHS, MEGA } from '../engine/colony.js';
 import { hashStr } from '../engine/rng.js';
 import { MEASURED } from '../engine/measured.js';
+import { isUnlocked, unlockText } from './progress.js';
 
-export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, onPractice, onCodex, onHelp }) {
+export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, onPractice, onCodex, onHelp, onStats }) {
   root.innerHTML = '';
   root.append(h('div', { class: 'title' },
     h('div', { class: 'planet' }),
@@ -22,11 +23,12 @@ export function titleScreen(root, { hasSave, saveInfo, meta, onContinue, onNew, 
     h('button', { class: 'btn block' + (hasSave ? '' : ' primary'), onclick: onNew }, '🚀 New expedition'),
     h('button', { class: 'btn block', onclick: onPractice }, '🪐 Quick colony (single map)'),
     h('div', { class: 'row' }, h('button', { class: 'btn grow', onclick: onCodex }, '📚 Codex'), h('button', { class: 'btn grow', onclick: onHelp }, '❓ How to play')),
+    meta && meta.runs ? h('button', { class: 'btn block', onclick: onStats }, '🖼 Stats card') : null,
     meta && meta.runs ? h('p', { class: 'faint', style: { textAlign: 'center', marginTop: '10px' } }, `Expeditions: ${meta.runs} · victories: ${meta.wins} · best colony: ${meta.bestColony || 0} Influence`) : null));
 }
 
 // Expedition setup: difficulty, optional modifiers and the chart seed.
-export function setupScreen(root, { onBack, onNext }) {
+export function setupScreen(root, { meta, onBack, onNext }) {
   let diff = 'standard';
   const mods = new Set();
   let seedMode = 'random';
@@ -37,7 +39,10 @@ export function setupScreen(root, { onBack, onNext }) {
   const draw = () => {
     body.innerHTML = '';
     body.append(h('div', { class: 'sect', style: { marginTop: 0 } }, 'Difficulty'),
-      h('div', { class: 'opt-grid' }, Object.entries(DIFFICULTY).map(([id, d]) => h('button', { class: 'opt' + (diff === id ? ' on' : ''), onclick: () => { diff = id; draw(); } }, h('h4', null, `${d.ic} ${d.n}`), h('p', null, d.d)))),
+      h('div', { class: 'opt-grid' }, Object.entries(DIFFICULTY).map(([id, d]) => {
+        const open = isUnlocked(meta, id);
+        return h('button', { class: 'opt' + (diff === id ? ' on' : '') + (open ? '' : ' locked'), 'aria-disabled': open ? null : 'true', onclick: () => { if (open) { diff = id; draw(); } } }, h('h4', null, `${d.ic} ${d.n}`), h('p', null, open ? d.d : unlockText(id)));
+      })),
       h('p', { class: 'faint', style: { fontSize: '12px' } }, 'Explorer and Standard open with a guided tour of the star chart and your first colony (you can skip it).'),
       h('div', { class: 'sect' }, 'Modifiers (optional)'),
       h('div', { class: 'opt-grid' }, Object.entries(MODIFIERS).map(([id, m]) => h('button', { class: 'opt' + (mods.has(id) ? ' on' : ''), onclick: () => { if (mods.has(id)) mods.delete(id); else mods.add(id); draw(); } }, h('h4', null, `${m.ic} ${m.n}`), h('p', null, m.d)))),
@@ -166,7 +171,7 @@ export function helpScreen(root, { onBack }) {
   root.append(h('div', { class: 'topbar' }, h('div', { class: 'row' }, h('button', { class: 'btn small', onclick: onBack }, '←'), h('h2', null, 'How to play'))),
     h('div', { class: 'page' },
       h('h3', null, 'The colony map'),
-      P('Each turn you build one card from your hand on an empty hex. Tap a card to see every legal hex with a forecast of the Influence it would earn (the best three glow gold). Tap a hex to confirm. Tap a card again for its full text. Misplaced something? Undo (if your difficulty allows it) rewinds the last placement.'),
+      P('Each turn you build one card from your hand on an empty hex. Tap a card to see every legal hex with a forecast of the Influence it would earn (the best three glow gold). Tap a hex to confirm. Tap a card again for its full text. Misplaced something? Undo (if your difficulty allows it) rewinds the last placement. 💡 Hint suggests a strong move: the first on each map is free, then 1 Integrity buys 2 more.'),
       P('Instead of building, you can spend the turn on the land itself: tap a Rock hex next to open ground and ⛏ Excavate it into a Cavern, or tap one of your buildings and 💥 Demolish it to free its hex. Both trigger nearby reactions as usual, and you still draw normally.'),
       P('Buildings fire on triggers: On Build, every turn, every N turns, while Sunlit, or reactively when something happens nearby – a resource is created, consumed or transformed, a hex heats or cools, a meteor lands, and so on. One placement can set off a long cascade. Each building can activate at most twice per turn.'),
       P('The asteroid rotates one quarter-turn each turn: the compass shows where the sun is. Lit hexes are brighter, Shadow hexes darker. Caverns (excavated rock) are always in Shadow.'),

@@ -487,8 +487,8 @@ A standard colony might have roughly 45–65 visible surface hexes, 10–25 buri
 ## 9.5 Cards, influence, and checkpoints
 
 - **One card played per turn**, with some rare effects creating bonus placement exceptions.
-- **Draw 1–3 new cards** each turn: one by default, +1 if effects from at least two of the active clans resolved in the previous turn, +1 if all three activated. Each draw is selected using the overworld's clan/card weights.
-- Unplayed cards persist in a hand of up to five; when full, scrap one for a small local Influence consolation or use a rare overwrite effect. Scrap here is a **hand action**, not a physical Scrap resource unless a card explicitly says it generates one.
+- **Draw 3 fresh cards** each turn (more with draw effects or Supply Drones). Each draw is selected using the overworld's clan/card weights.
+- Fresh cards that are not built are **salvaged** at the end of the turn for +1 Influence each and return to the draw pool. The opening hand (starters, enhancement and supply cards) and cards returned to hand by effects are **kept** until built. Salvage is a hand rule, not a physical Scrap resource.
 - Buildings earn **Influence** through activation, combinations, ecosystem milestones, and clever terrain usage. Influence is **local score only**, not a stackable world resource.
 - At roughly turns 5, 10, 15, and 20, meet scaling Influence thresholds. World hazard and optional contracts alter the expected scores. Difficulty should be expressed primarily through terrain and scoring constraints, not simply giant multipliers.
 - **Asteroid Integrity** starts at 10 on ordinary maps. Mining and hostile events can reduce it; Anchors and protections preserve it. At 0, the colony fractures.
@@ -1097,7 +1097,7 @@ The screen should make it delightful to watch an enormous cascade, but also expl
 
 ## 18.3 Key numerical questions for playtesting
 
-- Do 1–3 cards per turn and a hand of five offer enough agency without excessive analysis paralysis?
+- Does a fresh hand of three (plus kept cards) offer enough agency without excessive analysis paralysis?
 - Does the 16–22 turn colony length allow a three-clan identity to emerge before the run ends?
 - Does `1–3 goods per jump × four charges` create enough overworld income to meaningfully afford a few edits, but not every edit?
 - Does the Pressure track at `24` allow around 8–12 claims and some detours without punishing exploratory play too harshly?

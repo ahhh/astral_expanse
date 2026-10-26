@@ -5,7 +5,7 @@ import { CARDS, CLANS, RARITY, TIER } from '../engine/cards.js';
 import { RES, STATUS, FAMILIES, FAMILY_INFO } from '../engine/resources.js';
 import * as HX from '../engine/hex.js';
 import {
-  isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, scrapCard, bldAt, bldList, network, links, beaconLinked, BEACON_BONUS,
+  isLit, legalHexes, forecast, playCard, passTurn, digTurn, demolishTurn, digHexes, isKept, salvageValue, DRAW_PER_TURN, bldAt, bldList, network, links, beaconLinked, BEACON_BONUS,
   abilityState, abilityTargets, useAbility, EVENT_INFO, bossObjective, BOSS_INFO, integrateDone,
   SPECIALIZE, specializeDone, tierOpen, CAP, TECHS, chooseTech, MEGA, megaProgress, clone, cpGain, masterworkNeed,
   hintsLeft, useHint, buyHints, HINT_PACK,
@@ -217,7 +217,7 @@ export function colonyScreen(root, S, hooks) {
           s('rect', { x: cx - bw / 2, y: cy + 3.3, width: bw, height: 4, rx: 1.6, fill: '#08101ce6', stroke: col, 'stroke-width': 0.35, 'pointer-events': 'none' }),
           s('text', { x: cx, y: cy + 6.3, 'text-anchor': 'middle', 'font-size': 3.2, 'font-weight': 800, fill: '#fff', 'font-family': 'Chakra Petch, sans-serif', 'pointer-events': 'none' }, lbl),
         ];
-        tileImg(g, buildingTile(b.c), cx, cy, SZ * 0.79, () => [s('text', { x: cx, y: cy + (beacon ? 2.6 : 1.9), 'text-anchor': 'middle', 'font-size': beacon ? 8 : 5.4, 'font-weight': 800, fill: '#08101c', 'font-family': 'Chakra Petch, sans-serif', 'pointer-events': 'none' }, lbl)], badge);
+        tileImg(g, buildingTile((CARDS[b.c] && CARDS[b.c].base) || b.c), cx, cy, SZ * 0.79, () => [s('text', { x: cx, y: cy + (beacon ? 2.6 : 1.9), 'text-anchor': 'middle', 'font-size': beacon ? 8 : 5.4, 'font-weight': 800, fill: '#08101c', 'font-family': 'Chakra Petch, sans-serif', 'pointer-events': 'none' }, lbl)], badge);
         if (b.dis) g.append(s('polygon', { points: poly(cx, cy, SZ * 0.88), fill: '#000', 'fill-opacity': 0.55, 'pointer-events': 'none' }));
         if (b.acts) g.append(s('circle', { cx: cx + 5.2, cy: cy - 4.6, r: 1.3, fill: '#fff', stroke: '#08101c', 'stroke-width': 0.4, 'pointer-events': 'none' }));
         if (c.ability) {
@@ -329,10 +329,13 @@ export function colonyScreen(root, S, hooks) {
     handEl.innerHTML = '';
     if (!S.hand.length) handEl.append(h('div', { class: 'dim', style: { padding: '30px 10px' } }, 'No cards in hand – pass the turn to draw.'));
     S.hand.forEach((cid, i) => {
-      const el = cardEl(cid, { sel: sel === i, onclick: () => selectCard(i) });
+      const keep = isKept(S, i);
+      const el = cardEl(cid, { sel: sel === i, onclick: () => selectCard(i), kept: keep });
       el.dataset.tut = 'card-' + i;
+      el.title = keep ? 'Kept: stays in your hand until you build it' : `Fresh: salvaged for +${salvageValue(S)} if you don't build it this turn`;
       handEl.append(el);
     });
+    const fresh = S.hand.filter((_, i) => !isKept(S, i)).length;
     actEl.innerHTML = '';
     const busy = S.status !== 'play';
     actEl.append(
@@ -340,8 +343,7 @@ export function colonyScreen(root, S, hooks) {
       h('button', { class: 'btn', onclick: goals, 'data-tut': 'goals' }, '🎯 Goals'),
       h('button', { class: 'btn', disabled: busy, onclick: hint, 'data-tut': 'hint', title: hintsLeft(S) ? `${hintsLeft(S)} hint${hintsLeft(S) > 1 ? 's' : ''} left` : `1 Integrity buys ${HINT_PACK} hints` }, '💡 Hint', h('span', { class: 'faint' }, hintsLeft(S) ? ` ${hintsLeft(S)}` : ' ❤️')),
       hooks.undo ? h('button', { class: 'btn', disabled: busy || undoLeft() <= 0, onclick: undo, title: 'Rewind your last placement or pass' }, '↶ Undo') : null,
-      h('button', { class: 'btn', disabled: busy || sel == null || S.scrapped, onclick: scrap, title: 'Scrap the selected card for +1 Influence (once per turn)' }, '🗑 Scrap'),
-      h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', 'End this turn without building. The environment still advances and you draw normally.', 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; snap = { state: clone(S), turn }; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
+      h('button', { class: 'btn', disabled: busy, onclick: () => confirmSheet('Pass the turn?', `End this turn without building. The environment still advances, your ${fresh} fresh card${fresh === 1 ? ' is' : 's are'} salvaged (+${fresh * salvageValue(S)}) and you draw a fresh hand.`, 'Pass', () => { const seq = S.seq, before = S.influence, turn = S.turn; snap = { state: clone(S), turn }; passTurn(S); after(seq, false, before, turn); }) }, '⏭ Pass'),
       h('button', { class: 'btn', onclick: menu }, '☰'));
   }
 
@@ -468,7 +470,7 @@ export function colonyScreen(root, S, hooks) {
     const gain = S.influence - before;
     const other = gain - acts.reduce((x, e) => x + e.pts, 0);
     const steps = acts.map((e) => ({ el: feedLine(e), pts: e.pts }));
-    if (other) steps.push({ el: h('div', { class: 'logline' }, h('span', null, 'Scrap & overflow'), h('span', { class: 'dim' }), h('span', { class: 'pts' }, '+' + other)), pts: other });
+    if (other) steps.push({ el: h('div', { class: 'logline' }, h('span', null, 'Salvage & bonuses'), h('span', { class: 'dim' }), h('span', { class: 'pts' }, '+' + other)), pts: other });
     const cpHit = S.checkpoints.find((c) => c.turn === turn);
     const next = S.checkpoints.find((c) => c.met == null);
     const lines = h('div', { class: 'ts-lines' }, steps.length ? null : h('div', { class: 'dim' }, 'No buildings scored this turn.'));
@@ -699,7 +701,7 @@ export function colonyScreen(root, S, hooks) {
     for (const e of up) body.append(h('div', { class: 'item' }, h('h4', null, `${EVENT_INFO[e.type].ic} Turn ${e.turn}: ${EVENT_INFO[e.type].n}`), h('div', { class: 'dim' }, EVENT_INFO[e.type].d)));
     if (forecastCount() === 1 && !S.fullForecast) body.append(h('p', { class: 'faint' }, 'Build a Radar Dish to see the next 3 events.'));
     body.append(h('div', { class: 'sect' }, 'Card pool'),
-      h('p', { class: 'dim' }, `Mid buildings ${tierOpen(S, 'M') ? 'are unlocked' : `unlock on turn ${6 - 2 * (S.draw.research || 0)}`}; Advanced ${tierOpen(S, 'A') ? 'are unlocked' : `on turn ${11 - 2 * (S.draw.research || 0)}`}. Each turn you draw 1 card, +1 if ${S.clans.length > 1 ? 'two clans' : 'your clan'} activated last turn${S.clans.length >= 3 ? ', +1 more if all three did' : ''}.`));
+      h('p', { class: 'dim' }, `Mid buildings ${tierOpen(S, 'M') ? 'are unlocked' : `unlock on turn ${6 - 2 * (S.draw.research || 0)}`}; Advanced ${tierOpen(S, 'A') ? 'are unlocked' : `on turn ${11 - 2 * (S.draw.research || 0)}`}. Each turn you draw ${DRAW_PER_TURN} fresh cards${S.clans.length >= 2 ? ` (+1 when two clans activated${S.clans.length >= 3 ? ', +2 when all three did' : ''})` : ''}; the ones you don't build are salvaged for +${salvageValue(S)} each. Kept cards (📌, your opening hand and cards returned to hand) stay until built.`));
     sheet({ title: 'Goals & forecast', body });
   }
 
@@ -730,12 +732,6 @@ export function colonyScreen(root, S, hooks) {
     toast(`Try ${CARDS[m.cid].n} on the gold hex`);
     fc = { [m.k]: Math.round(forecast(S, m.i, m.k, 2).soon) };
     drawMap();
-  }
-
-  function scrap() {
-    if (sel == null) return;
-    const name = CARDS[S.hand[sel]].n;
-    if (scrapCard(S, sel)) { sel = null; fc = null; hooks.save(); render(); toast(`Scrapped ${name} (+1)`); }
   }
 
   function menu() {

@@ -13,17 +13,26 @@
 //   react         reactive listener: p × rate × H (rate = expected triggers/turn)
 //   passive       auras/passives: (p + u) × rate × H
 //   ability       once-per-era abilities: ≈ ceil(H/5) uses × (p + u)
+//   imp           Import bonus × share of conversions using another clan's token
 //   cost          drawbacks: Integrity −1 ≈ 3 PP, self-Radiation ≈ 1 PP
 //
 // Utility table (Influence-equivalent):
 //   create a loose resource token 2 · enabling transform 1 · reveal 1.5
 //   new Cavern space 2 · stabilize/shield a hex 1 · repeat another building ≈ 5
 //   extra card draw 3 · one Integrity 3
+export const IMPORT_RATE = 0.12;
 export const HORIZON = { E: 12, M: 9, A: 6 };
 export const BANDS = {
   C: { min: 15, max: 26, target: 20 },
   U: { min: 24, max: 34, target: 29 },
   R: { min: 33, max: 46, target: 39 },
+};
+
+// Compacts are treaty-only upgrades, so they price one step above their rarity.
+export const COMPACT_MULT = 1.3;
+export const bandOf = (c) => {
+  const b = BANDS[c.r];
+  return c.compact ? { min: Math.round(b.min * COMPACT_MULT), max: Math.round(b.max * COMPACT_MULT), target: Math.round(b.target * COMPACT_MULT) } : b;
 };
 
 export function actsFor(c, H) {
@@ -50,8 +59,12 @@ export function rubric(c) {
   if (rb.react && rb.u2) parts.react += rb.u2 * rb.react.rate * H;
   parts.passive = rb.passive ? (rb.passive.p + (rb.passive.u || 0)) * rb.passive.rate * H : 0;
   parts.ability = rb.ability ? Math.ceil(H / 5) * (rb.ability.p + (rb.ability.u || 0)) : 0;
+  // Import bonus: paid on roughly IMPORT_RATE of conversions in a mixed treaty.
+  parts.imp = c.imp ? c.imp * (rb.impRate ?? IMPORT_RATE) * (c.run ? acts * rel : rb.react ? rb.react.rate * H : 0) : 0;
+  // Compact hook: priced at its points × how often the partner sets it off.
+  parts.compact = c.cx ? c.cx.p * c.cx.rate * (c.cx.kind === 'adj' ? acts : H) : 0;
   parts.cost = -(rb.cost || 0);
   const pp = Object.values(parts).reduce((s, v) => s + v, 0);
-  const band = BANDS[c.r];
+  const band = bandOf(c);
   return { pp: Math.round(pp * 10) / 10, parts, H, acts, band, ok: pp >= band.min && pp <= band.max };
 }

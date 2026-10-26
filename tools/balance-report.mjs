@@ -4,7 +4,7 @@
 //   node tools/calibrate.mjs docs/sim-results.json   (optional, then re-run sim)
 //   node tools/balance-report.mjs docs/sim-results.json
 import { readFileSync, writeFileSync } from 'node:fs';
-import { CARD_LIST, CLANS, CLAN_IDS, RARITY, TIER } from '../js/engine/cards.js';
+import { CARD_LIST, COMPACT_LIST, CARDS, CLANS, CLAN_IDS, RARITY, TIER } from '../js/engine/cards.js';
 import { rubric, BANDS, HORIZON } from '../js/engine/rubric.js';
 import { checkpointsFor } from '../js/engine/mapgen.js';
 
@@ -56,8 +56,8 @@ L.push('');
 L.push('## 3. Results');
 L.push('');
 const games = sim.games;
-L.push(`- Bot win rate on an ordinary sector-1 colony: **${Math.round((100 * sim.wins) / games)}%**; final Influence median **${sim.finals.slice().sort((a, b) => a - b)[Math.floor(games / 2)]}**.`);
-L.push(`- Checkpoint curve: need(t) = difficulty × (0.9t² + 1.95t); each checkpoint asks for the increment since the previous one (×0.9 after the first) → ${checkpointsFor(21, 1).map((c) => `T${c.turn}: ${c.need}`).join(', ')} on a sector-1 21-turn map. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).`);
+L.push(`- Bot win rate on an ordinary sector-1 colony with a three-clan treaty: **${Math.round((100 * sim.wins) / games)}%**; final Influence median **${sim.finals.slice().sort((a, b) => a - b)[Math.floor(games / 2)]}**.`);
+L.push(`- Checkpoint curve: need(t) = 1.24 × difficulty × (0.0125t³ + 0.71t² + 4.5t), scaled so a solo clan clears an ordinary sector-1 colony ~90% of the time; each checkpoint asks for the increment since the previous one (×0.9 after the first) → ${checkpointsFor(21, 1).map((c) => `T${c.turn}: ${c.need}`).join(', ')} on a sector-1 21-turn map. Each later sector raises difficulty by 8%, Fault Worlds by +12%, the finale by +15% (+20% per missing Gate Shard).`);
 L.push('');
 L.push('### Clan balance');
 L.push('');
@@ -103,11 +103,12 @@ L.push('- **Converters reach range 2** (Smelting Stack, Algae Tank, Breaker Yard
 L.push('- **Starters are self-sufficient.** Every clan opens with a guaranteed producer, and the map always seeds that clan\'s key resources near the landing zone. Spore Seeder plants its own Organic Seam when it has nothing to convert.');
 L.push('- **Board-counting scorers were cut hard.** Data Scriptorium, Network Brain, Skyhook, Path Optimizer and Pressure Dome scored 2–4× their band because large networks are easy to build.');
 L.push('- **Rarely-firing payoffs got fallbacks.** Many reactive cards also have a small periodic effect, so a card never sits completely idle.');
+L.push('- **Fresh hands.** Each turn deals 3 fresh cards; unbuilt ones are salvaged for +1 each (opening-hand and returned cards are kept). The old 5-card hand clogged with Early cards and scrapped new draws unseen, so Advanced cards now reach the board 2–3× as often and the bot only builds situational cards in good spots. That selection lifts measured PP about 12% over the rubric across the board, so bands are judged on clear relative outliers. The checkpoint curve gained a cubic term for the steeper late game, and Masterwork dropped from 1.25× to 1.2× the checkpoint total.');
 L.push('');
 L.push('### Limits');
 L.push('');
 L.push('- The bot is greedy with a 3-turn horizon. It undervalues long setups and abilities (it uses one only when the immediate gain is ≥10), so combo-heavy Rares may play stronger in human hands.');
-L.push('- Boss maps and the overworld economy are not part of this simulation. `tools/expedition-smoke.mjs` only checks that whole expeditions run end to end.');
+L.push('- This report plays three-clan treaties only. Solo and two-clan treaties, boss maps and techs are covered by `tools/simsuite.mjs` (solo, duos, treaty, boss, tech suites); a lone clan is tuned to win about 90% of sector-1 colonies. The overworld economy is not simulated; `tools/expedition-smoke.mjs` only checks that whole expeditions run end to end.');
 L.push('');
 L.push('## 5. Card tables');
 L.push('');
@@ -128,7 +129,18 @@ for (const cl of CLAN_IDS) {
   }
 }
 L.push('');
-L.push('## 6. Re-running');
+L.push('## 6. Clan Compacts');
+L.push('');
+L.push('Each pair of clans in a treaty upgrades one building per clan into a compact that feeds on the partner; it replaces the base card in that clan\'s pool. Compacts price at 1.3× their rarity band. Meas. counts only games where the treaty unlocked it, so it is inflated by selection: a compact is built where its partner already is.');
+L.push('');
+L.push('| Clan | Partner | Compact | Upgrades | Rarity | PP | Meas. | Base meas. | Placed | Compact effect |');
+L.push('|---|---|---|---|---|---|---|---|---|---|');
+for (const c of COMPACT_LIST) {
+  const o = obs[c.id] || { obs: 0, placed: 0 };
+  L.push(`| ${CLANS[c.cl].ic} | ${CLANS[c.partner].ic} | **${c.n}** | ${CARDS[c.base].n} | ${RARITY[c.r].n} | ${f1(rubric(c).pp)} | ${f1(o.obs)} | ${f1((obs[c.base] || { obs: 0 }).obs)} | ${o.placed} | ${c.text.slice(c.text.indexOf('Compact:') + 9).replace(/\|/g, '/')} |`);
+}
+L.push('');
+L.push('## 7. Re-running');
 L.push('');
 L.push('```sh');
 L.push('node tools/rubric-check.mjs                          # rubric PP and band check');

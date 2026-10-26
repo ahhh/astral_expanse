@@ -2,15 +2,28 @@
 // so the browser UI, save files and the headless balance simulator share it.
 //
 // Turn order: place a card (On Build + reactive cascade) -> light rotates ->
-// timed/periodic buildings fire in placement order (late cards last) ->
-// scheduled local event -> boss hazard -> statuses decay -> checkpoint -> draw.
-import { CARDS, CLANS, RARITY, canRepeatCard } from './cards.js';
+// unplayed fresh cards are salvaged -> light rotates -> timed/periodic
+// buildings fire in placement order (late cards last) -> scheduled local event
+// -> boss hazard -> statuses decay -> draw a fresh hand -> checkpoint.
+import { CARDS, CLANS, RARITY, TRADE_BONUS, canRepeatCard } from './cards.js';
 import { RES, resIs } from './resources.js';
 import * as H from './hex.js';
 import { rnd, rint, pick, weighted } from './rng.js';
 
 export const CAP = 2;
-export const HAND_MAX = 5;
+// Clan drawbacks. Synapse Overheat: after a Synapse building repeats another
+// building its hex is Hot for OVERHEAT_TURNS, and it cannot repeat while Hot.
+// Hearthline Upkeep: every UPKEEP_EVERY turns each Hearthline Habitat eats a
+// Water, Biomass or Fuel within range 2; each hungry one costs UPKEEP_COST.
+export const OVERHEAT_TURNS = 2;
+export const UPKEEP_EVERY = 3;
+export const UPKEEP_COST = 3;
+export const UPKEEP_FOOD = ['Water', 'Biomass', 'Fuel'];
+// Each turn deals DRAW_PER_TURN fresh cards; whichever are not built are
+// salvaged at the end of the turn. Kept cards (the opening hand and cards
+// returned to hand by effects) stay until built, up to KEEP_MAX of them.
+export const DRAW_PER_TURN = 3;
+export const KEEP_MAX = 5;
 const card = (b) => CARDS[b.c];
 const era = (S) => Math.ceil(S.turn / 5);
 
@@ -53,7 +66,8 @@ export function canPlace(S, cid, k) {
   const h = S.hexes[k];
   const c = CARDS[cid];
   if (!h || h.b) return false;
-  if (h.res && !h.hid && !(S.stripLeft > 0)) return false;
+  // Loose tokens can be built over (they are cleared); natural deposits need Field Survey.
+  if (h.res && !h.hid && RES[h.res].dep && !(S.stripLeft > 0)) return false;
   if (h.kind === 'orbit') return c.tags.includes('Orbit') || c.tags.includes('Orbital');
   return h.kind === 'surface' || h.kind === 'cavern';
 }
@@ -225,9 +239,11 @@ export function activate(S, b, ev, o = {}) {
   } finally {
     S._depth--;
   }
+  // Synapse Overheat: a Synapse building that repeated something heats its own hex.
+  if (ctx.heat && addStatus(S, b.k, 'Hot', OVERHEAT_TURNS, b.id)) { S.stats.overheats = (S.stats.overheats || 0) + 1; note(S, `${c.n} overheats`, b.k); }
   if (!ctx.did && ctx.pts <= 0) { b.acts--; return false; }
   const aura = ctx.pts > 0 ? auraBonus(S, b) : 0;
-  const oc = ctx.pts > 0 ? (hasTech(S, 'overclock') && b.acts >= 2 ? 2 : 0) + (hasTech(S, 'shieldgrid') && H.dist(b.k, '0,0') === 1 ? 1 : 0) + beaconBonus(S, b) : 0;
+  const oc = ctx.pts > 0 ? (hasTech(S, 'overclock') && b.acts >= 2 ? 1 : 0) + (hasTech(S, 'shieldgrid') && H.dist(b.k, '0,0') === 1 ? 1 : 0) + beaconBonus(S, b) : 0;
   const total = ctx.pts + aura + oc;
   S.influence += total;
   b.inf += ctx.pts;
@@ -257,11 +273,19 @@ function note(S, txt, k) {
 // ---------------------------------------------------------------- mutations
 // Units per natural deposit; loose tokens are always 1.
 export const DEPOSIT_UNITS = { Ore: 3, Gold: 2, Ice: 3, Gas: 2, Crystal: 2, Loam: 3, Seam: 2, Wreck: 3, Regolith: 2, Anomaly: 2, Growth: 1 };
-function setRes(S, k, type, amt = 1) {
+// `by` is the clan whose building made the token (null for deposits and events).
+function setRes(S, k, type, amt = 1, by = null) {
   S.rver = (S.rver || 0) + 1;
   S.hexes[k].res = type;
   S.hexes[k].hid = false;
   S.hexes[k].amt = amt;
+  S.hexes[k].by = by;
+}
+// A token another active clan's building made. Using one scores TRADE_BONUS
+// (or a card's `imp`) once per activation.
+export function imported(S, k, clan) {
+  const h = S.hexes[k];
+  return !!(h && h.res && !h.hid && h.by && h.by !== clan && S.clans.includes(h.by));
 }
 function recordCreate(S, type) {
   if (type === 'Alloy') {
@@ -341,7 +365,17 @@ const sysApi = (S) => mkApi(S, { b: null, ev: null, did: false, pts: 0, notes: [
 export function mkApi(S, ctx) {
   const self = ctx.b;
   const src = self ? self.id : null;
+  const by = self ? self.clan : null;
   const did = () => { ctx.did = true; };
+  const importBonus = (k) => {
+    if (!self || ctx.imp || !imported(S, k, self.clan)) return;
+    const imp = card(self).imp || TRADE_BONUS;
+    ctx.imp = true;
+    ctx.pts += imp;
+    ctx.notes.push(`🤝 trade +${imp}`);
+    S.stats.imports = (S.stats.imports || 0) + 1;
+    self.imps = (self.imps || 0) + 1;
+  };
   const a = {
     S, b: self, k: self && self.k, turn: S.turn, ev: ctx.ev, clans: S.clans, tstat: S.tstat,
     get era() { return era(S); },
@@ -356,6 +390,7 @@ export function mkApi(S, ctx) {
     near: (k, r = 1) => H.near(S.R, k, r),
     kind: (k) => S.hexes[k] && S.hexes[k].kind,
     res: (k) => (S.hexes[k] && !S.hexes[k].hid ? S.hexes[k].res : null),
+    imported: (k) => !!self && imported(S, k, self.clan),
     hidden: (k) => !!(S.hexes[k] && S.hexes[k].hid && S.hexes[k].res),
     is: resIs,
     resNear: (k, sel, r = 1) => H.near(S.R, k, r).filter((n) => { const h = S.hexes[n]; return h.res && !h.hid && resIs(h.res, sel); }),
@@ -406,16 +441,17 @@ export function mkApi(S, ctx) {
       const h = S.hexes[k];
       const from = h.res;
       if (!from || h.hid) return false;
+      importBonus(k);
       let at = k;
       if ((h.amt || 1) > 1) {
         const opts = H.near(S.R, k, 1).filter((n) => isFree(S, n));
         if (opts.length) {
           at = self ? opts.sort((x, y) => H.dist(x, self.k) - H.dist(y, self.k))[0] : opts[0];
           h.amt--;
-          setRes(S, at, to);
+          setRes(S, at, to, 1, by);
         }
       }
-      if (at === k) { h.res = to; h.amt = 1; S.rver = (S.rver || 0) + 1; }
+      if (at === k) { h.res = to; h.amt = 1; h.by = by; S.rver = (S.rver || 0) + 1; }
       did();
       ctx.notes.push(`${RES[from].ic}→${RES[to].ic}`);
       if (from === 'Gold') { S.stats.precious++; bossHook(S, 'gold'); }
@@ -438,7 +474,7 @@ export function mkApi(S, ctx) {
     },
     createAt(type, k) {
       if (!isFree(S, k)) return false;
-      setRes(S, k, type);
+      setRes(S, k, type, 1, by);
       did();
       ctx.notes.push(`+${RES[type].ic}`);
       recordCreate(S, type);
@@ -450,8 +486,9 @@ export function mkApi(S, ctx) {
       const h = S.hexes[k];
       if (!h.res || h.hid) return null;
       const t = h.res;
+      importBonus(k);
       if (!all && (h.amt || 1) > 1) h.amt--;
-      else { h.res = null; h.amt = 1; S.rver = (S.rver || 0) + 1; }
+      else { h.res = null; h.amt = 1; h.by = null; S.rver = (S.rver || 0) + 1; }
       did();
       if (t === 'Ice' || t === 'Water') S.stats.water = (S.stats.water || 0) + 1;
       ctx.notes.push(`−${RES[t].ic}`);
@@ -462,7 +499,9 @@ export function mkApi(S, ctx) {
     move(f, t) {
       if (!S.hexes[f].res || !isFree(S, t)) return false;
       S.hexes[t].res = S.hexes[f].res;
+      S.hexes[t].by = S.hexes[f].by;
       S.hexes[f].res = null;
+      S.hexes[f].by = null;
       S.rver = (S.rver || 0) + 1;
       did();
       return true;
@@ -494,15 +533,18 @@ export function mkApi(S, ctx) {
     integrity(d) { did(); if (d < 0) loseIntegrity(S, -d, card(self).n); else S.integrity = Math.min(S.maxIntegrity, S.integrity + d); },
     repeat(b, extra = false) {
       if (!b || b.id === src || !canRepeatCard(card(b))) return false;
+      const syn = self && self.clan === 'syn';
+      if (syn && !ctx.heat && S.hexes[self.k].st.Hot) { ctx.notes.push('overheated'); return false; }
       const c = card(b);
       const ok = activate(S, b, null, { repeat: true, extra, fn: c.run || c.build });
-      if (ok) did();
+      if (ok) { did(); if (syn) ctx.heat = true; }
       return ok;
     },
     draw(n) { S.bonusDraw += n; did(); },
     destroy(b) { if (destroyBuilding(S, b, src)) did(); },
     toHand(cid) {
-      if (S.hand.length < HAND_MAX) { S.hand.push(cid); did(); }
+      const keep = kept(S);
+      if (keep.length < KEEP_MAX) { keep.push(cid); S.hand.push(cid); did(); }
     },
     launch(k) {
       const t = a.consume(k);
@@ -727,9 +769,12 @@ export function tierOpen(S, t) {
   if (t === 'M') return S.turn >= 6 - 2 * sh;
   return S.turn >= 11 - 2 * sh;
 }
+// Clan Compacts turn up twice as often as an ordinary card of their rarity.
+export const COMPACT_WEIGHT = 2;
 export function cardWeight(S, c) {
-  if (S.draw.ban.includes(c.id) || !tierOpen(S, c.t)) return 0;
-  return RARITY[c.r].w * (S.draw.fav[c.id] || 1);
+  const id = c.base || c.id;
+  if (S.draw.ban.includes(id) || !tierOpen(S, c.t)) return 0;
+  return RARITY[c.r].w * (S.draw.fav[id] || 1) * (c.compact ? COMPACT_WEIGHT : 1);
 }
 export function drawOne(S, opt = {}) {
   const clanW = S.clans.map((cl) => [cl, S.draw.presence[cl] || 1]);
@@ -741,20 +786,47 @@ export function drawOne(S, opt = {}) {
   }
   return null;
 }
-function dealDraws(S, n) {
+export function dealDraws(S, n) {
   for (let i = 0; i < n; i++) {
     const id = drawOne(S);
-    if (!id) continue;
-    if (S.hand.length < HAND_MAX) S.hand.push(id);
-    else { const v = hasTech(S, 'drone') ? 2 : 1; S.influence += v; note(S, `Hand full – ${CARDS[id].n} scrapped (+${v})`); }
+    if (id) S.hand.push(id);
   }
+}
+// Kept cards are a sub-multiset of the hand. Saves from before fresh hands
+// have no list: their whole accumulated hand is kept.
+export function kept(S) {
+  if (!S.keep) S.keep = S.hand.slice();
+  return S.keep;
+}
+export const isKept = (S, handIdx) => {
+  const cid = S.hand[handIdx];
+  const nk = kept(S).filter((x) => x === cid).length;
+  return S.hand.slice(0, handIdx + 1).filter((x) => x === cid).length <= nk;
+};
+// Take a card out of the hand, spending a fresh copy before a kept one.
+function takeFromHand(S, handIdx) {
+  const [cid] = S.hand.splice(handIdx, 1);
+  const keep = kept(S);
+  if (S.hand.filter((x) => x === cid).length < keep.filter((x) => x === cid).length) keep.splice(keep.indexOf(cid), 1);
+  return cid;
+}
+export const SALVAGE = 1;
+export const salvageValue = () => SALVAGE;
+// Unplayed fresh cards return to the draw pool for a small salvage payout.
+function salvageHand(S) {
+  const n = S.hand.length - kept(S).length;
+  S.hand = kept(S).slice();
+  if (n <= 0) return;
+  const v = n * salvageValue(S);
+  S.influence += v;
+  S.stats.salvaged = (S.stats.salvaged || 0) + v;
+  note(S, `♻️ Salvaged ${n} unplayed card${n > 1 ? 's' : ''} (+${v})`);
 }
 
 // ---------------------------------------------------------------- turn flow
 export function resetTurnState(S) {
   for (const b of bldList(S)) b.acts = 0;
   S.tstat = { acts: [], consumed: [], clans: {} };
-  S.scrapped = false;
   S.feed = S.feed.slice(-400);
   S._q = [];
 }
@@ -764,11 +836,13 @@ export function playCard(S, handIdx, k) {
   const cid = S.hand[handIdx];
   if (!cid || !canPlace(S, cid, k)) return false;
   S._q = [];
-  S.hand.splice(handIdx, 1);
+  takeFromHand(S, handIdx);
   const c = CARDS[cid];
   const h = S.hexes[k];
-  if (h.res && !h.hid) { S.stripLeft--; note(S, `🛰️ Built over ${h.res} (${S.stripLeft} left)`, k); }
-  if (h.res) { h.res = null; h.hid = false; S.rver = (S.rver || 0) + 1; }
+  const cleared = h.res && !h.hid && !RES[h.res].dep ? h.res : null;
+  if (h.res && !h.hid && !cleared) { S.stripLeft--; note(S, `🛰️ Built over ${h.res} (${S.stripLeft} left)`, k); }
+  if (h.res) { h.res = null; h.hid = false; h.by = null; S.rver = (S.rver || 0) + 1; }
+  if (cleared) emit(S, { type: 'consume', k, res: cleared, src: null });
   const id = S.nextId++;
   const b = { id, c: cid, k, clan: c.cl, acts: 0, age: 0, sun: 0, mem: {}, placed: S.turn, inf: 0, dis: 0 };
   S.blds[id] = b;
@@ -816,15 +890,6 @@ export function demolishTurn(S, k) {
   destroyBuilding(S, b, null);
   processQueue(S);
   endTurn(S);
-  return true;
-}
-
-export function scrapCard(S, handIdx) {
-  if (S.scrapped || S.status !== 'play' || !S.hand[handIdx]) return false;
-  const [cid] = S.hand.splice(handIdx, 1);
-  S.influence += 1;
-  S.scrapped = true;
-  note(S, `Scrapped ${CARDS[cid].n} (+1)`);
   return true;
 }
 
@@ -897,6 +962,8 @@ function periodicDue(S, b) {
 
 export function endTurn(S) {
   S.turnStartSeq = S.turnStartSeq ?? 0;
+  // 0. salvage the fresh cards that were not built
+  salvageHand(S);
   // 1. rotation
   rotate(S);
   processQueue(S);
@@ -916,6 +983,7 @@ export function endTurn(S) {
   // 2b. mega-projects and local technologies
   megaStep(S);
   techStep(S);
+  upkeep(S);
   // 3. scheduled event
   for (const E of S.events) if (E.turn === S.turn && !E.done) runEvent(S, E);
   // 4. boss
@@ -932,17 +1000,25 @@ export function endTurn(S) {
   checkFail(S);
   if (S.status !== 'play') return;
   if (S.turn >= S.turns) { checkpoint(S, S.turn); finish(S); return; }
-  // 7. next turn & draws
+  // 7. next turn & a fresh hand
   S.lastClans = clansNow;
-  const draws = drawsFor(S, clansNow) + S.bonusDraw + (hasTech(S, 'drone') ? 1 : 0) + ((S.tradeCharter || []).includes(S.turn + 1) ? 1 : 0);
+  const draws = DRAW_PER_TURN + treatyDraws(S, clansNow) + S.bonusDraw + (hasTech(S, 'drone') ? 1 : 0) + ((S.tradeCharter || []).includes(S.turn + 1) ? 1 : 0);
   S.bonusDraw = 0;
   S.turn++;
   resetTurnState(S);
   dealDraws(S, draws);
   S.lastDraw = draws;
-  // 8. checkpoint for the turn that just ended – after the draws, so hand-full scrap counts
+  // 8. checkpoint for the turn that just ended
   checkpoint(S, S.turn - 1);
   checkFail(S);
+}
+
+// Treaty draws: +1 fresh card when two of your clans activated this turn, +1
+// more when all three did. A mixed hand is split across pools; this and the
+// Compact cards keep a treaty ahead of a lone, perfectly coherent clan.
+export function treatyDraws(S, clansNow) {
+  if (S.clans.length < 2) return 0;
+  return (clansNow >= 2 ? 1 : 0) + (S.clans.length >= 3 && clansNow >= 3 ? 1 : 0);
 }
 
 // Influence earned toward the current checkpoint. Saves from before segmented
@@ -962,10 +1038,21 @@ function checkpoint(S, turn) {
   else { note(S, `⚠️ Checkpoint ${cp.need} missed`); loseIntegrity(S, 3, 'missed checkpoint'); }
 }
 
-// 1 draw, +1 if two clans activated (or your only clan did), +1 more if all three did.
-export function drawsFor(S, clansNow) {
-  const n = S.clans.length;
-  return 1 + (clansNow >= Math.min(2, n) ? 1 : 0) + (n >= 3 && clansNow >= 3 ? 1 : 0);
+function upkeep(S) {
+  if (!S.clans.includes('hearth') || S.turn % UPKEEP_EVERY) return;
+  let fed = 0, hungry = 0;
+  for (const b of bldList(S)) {
+    if (b.clan !== 'hearth' || !hasTag(b, 'Habitat') || blocked(S, b)) continue;
+    const k = H.near(S.R, b.k, 2).find((n) => { const h = S.hexes[n]; return h.res && !h.hid && UPKEEP_FOOD.includes(h.res); });
+    if (k) { mkApi(S, { b, ev: null, did: false, pts: 0, notes: [] }).consume(k); fed++; } else hungry++;
+  }
+  processQueue(S);
+  if (!fed && !hungry) return;
+  const v = hungry * UPKEEP_COST;
+  S.influence -= v;
+  S.stats.hungry = (S.stats.hungry || 0) + hungry;
+  S.stats.fed = (S.stats.fed || 0) + fed;
+  note(S, `🍽 Upkeep: ${fed} Habitat${fed === 1 ? '' : 's'} fed${hungry ? `, ${hungry} went hungry (−${v})` : ''}`);
 }
 
 // ---------------------------------------------------------------- local technologies
@@ -975,9 +1062,9 @@ export const TECHS = {
   survey: { n: 'Field Survey', ic: '🛰️', d: 'Reveal every buried surface deposit. Up to 4 times this map, you may build on top of a deposit, clearing it.' },
   weave: { n: 'Structural Weave', ic: '🧱', d: '+3 Integrity and +3 maximum Integrity. At the end of each turn, +1 Influence per 5 Integrity you have.' },
   shieldgrid: { n: 'Shield Grid', ic: '🛡️', d: 'Every hex within range 2 of the Charter Beacon counts as Shielded, and buildings next to the Beacon score +1 per activation.' },
-  overclock: { n: 'Overclock', ic: '⚡', d: 'Every building may activate one extra time per turn, and its second and later activations each turn score +2.' },
-  drone: { n: 'Supply Drones', ic: '📦', d: 'Draw 1 extra card every turn. Cards that overflow your hand score +2 instead of +1.' },
-  resonance: { n: 'Clan Resonance', ic: '🎼', d: 'At the end of each turn, +1 Influence per clan that activated, +1 more if all three did.' },
+  overclock: { n: 'Overclock', ic: '⚡', d: 'Every building may activate one extra time per turn, and its second and later activations each turn score +1.' },
+  drone: { n: 'Supply Drones', ic: '📦', d: 'Draw 1 extra card every turn.' },
+  resonance: { n: 'Clan Resonance', ic: '🎼', d: 'At the end of each turn, +1 Influence per clan that activated, +2 more if all three did.' },
 };
 export const hasTech = (S, id) => !!(S.techs && S.techs.includes(id));
 function offerTech(S) {
@@ -1013,7 +1100,7 @@ function techStep(S) {
   }
   if (hasTech(S, 'resonance')) {
     const n = Object.keys(S.tstat.clans).filter((c) => S.clans.includes(c)).length;
-    const v = n + (n >= 3 ? 1 : 0);
+    const v = n + (n >= 3 ? 2 : 0);
     if (v) { S.influence += v; note(S, `🎼 Clan Resonance +${v}`); }
   }
 }
@@ -1096,8 +1183,8 @@ export function integrateDone(S) {
   return S.clans.every((c) => cl.has(c)) && network(S, beacon).length >= 2;
 }
 
-// Masterwork: total Influence 25% above the sum of every checkpoint target.
-export const masterworkNeed = (S) => Math.round(1.25 * (S.cpBase == null ? S.checkpoints.at(-1).need : S.checkpoints.reduce((s, c) => s + c.need, 0)));
+// Masterwork: total Influence 20% above the sum of every checkpoint target.
+export const masterworkNeed = (S) => Math.round(1.2 * (S.cpBase == null ? S.checkpoints.at(-1).need : S.checkpoints.reduce((s, c) => s + c.need, 0)));
 function finish(S) {
   const finalCp = S.checkpoints[S.checkpoints.length - 1];
   const ok = finalCp.met;

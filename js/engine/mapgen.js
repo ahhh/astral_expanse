@@ -1,8 +1,8 @@
 // Procedural colony maps from a resource profile (0–5 per family).
 import * as H from './hex.js';
 import { rnd, rint, pick, shuffle, weighted } from './rng.js';
-import { CARDS, clanCards } from './cards.js';
-import { drawOne, resetTurnState, isFree, DEPOSIT_UNITS } from './colony.js';
+import { CARDS, clanCards, compactsFor } from './cards.js';
+import { dealDraws, resetTurnState, isFree, DEPOSIT_UNITS, DRAW_PER_TURN } from './colony.js';
 
 // Resources each clan needs to get its first engine going (minimum-viability rule).
 export const CLAN_SEEDS = {
@@ -16,17 +16,18 @@ export const STARTERS = {
   wreck: 'breaker_yard', kep: 'launch_rail', hearth: 'pressure_dome', umbra: 'void_prism',
 };
 
-// Influence checkpoint curve (cumulative): need(t) = diff × (0.9t² + 1.95t).
-// Fitted to the greedy bot's 10th-percentile Influence in tools/sim.mjs
-// (≈37 / 141 / 292 / 468 at turns 5/10/15/20, Beacon bonus included), so a
-// solid player clears an ordinary sector-1 colony ~90% of the time; later
-// sectors raise `diff`.
+// Influence checkpoint curve (cumulative): need(t) = diff × (0.0125t³ + 0.71t² + 4.5t).
+// Fitted to the greedy bot's 10th-percentile segment Influence in tools/sim.mjs
+// (≈51 / 109 / 156 / 231 for turns 1–5 / 6–10 / 11–15 / 16–21, Beacon bonus
+// included), so a solid player clears an ordinary sector-1 colony ~90% of the
+// time; later sectors raise `diff`. Fresh 3-card hands put Advanced cards on
+// the board as soon as they unlock, so the cubic term steepens the late game.
 // Checkpoints fall every 5 turns plus the final turn. Each one asks only for the
 // Influence earned since the previous checkpoint (the curve's increment × LATE
-// after the first), so a miss never leaves you in the hole. Segment gains swing
-// more than running totals, so LATE < 1 still lands later checkpoints a bit
-// harder than the old cumulative ones (bot win rate ≈95% → ≈90%).
-export const checkpointNeed = (t, diff) => Math.round(diff * (0.9 * t * t + 1.95 * t));
+// after the first), so a miss never leaves you in the hole.
+// CURVE scales the whole curve; it sets the solo-clan win rate (≈90%).
+const CURVE = 1.24;
+export const checkpointNeed = (t, diff) => Math.round(CURVE * diff * (0.0125 * t * t * t + 0.71 * t * t + 4.5 * t));
 const LATE = 0.9;
 export function checkpointsFor(turns, diff) {
   const at = [];
@@ -161,7 +162,8 @@ export function genColony(opts) {
 
   // Card pools and Directorate settings.
   const dc = opts.draw || {};
-  for (const cl of S.clans) S.pool[cl] = (dc.extra && dc.extra[cl] ? dc.extra[cl] : []).concat(clanCards(cl).map((c) => c.id));
+  const cx = compactsFor(S.clans);
+  for (const cl of S.clans) S.pool[cl] = (dc.extra && dc.extra[cl] ? dc.extra[cl] : []).concat(clanCards(cl).map((c) => (cx[cl] && cx[cl][c.id]) || c.id));
   S.draw.presence = Object.assign({}, dc.presence || {});
   S.draw.fav = Object.assign({}, dc.fav || {});
   S.draw.ban = (dc.ban || []).slice();
@@ -197,19 +199,17 @@ export function genColony(opts) {
   S.seed = rng.seed;
 
   resetTurnState(S);
-  // Opening hand: each clan's starter producer plus one random draw.
-  // Smaller treaties get extra Early draws so the opening hand holds 3+ cards.
+  // Opening hand: each clan's starter producer and any bought cards are kept
+  // until built; on top of them comes the first fresh hand.
   for (const cl of S.clans) S.hand.push(STARTERS[cl]);
-  for (let i = 0; i < Math.max(1, 3 - S.clans.length); i++) {
-    const extra = drawOne(S, { tier: 'E' });
-    if (extra) S.hand.push(extra);
-  }
   for (const cid of handBonus) if (S.hand.length < 5) S.hand.push(cid);
   if (opts.loaner && !S.hand.includes(opts.loaner)) S.hand.push(opts.loaner);
   for (const cid of S.supplyCards || []) if (S.hand.length < 5) S.hand.push(cid);
   if (opts.dispatch && !S.hand.includes(opts.dispatch)) S.hand.push(opts.dispatch);
-  // A bonus draw bought by a Trade Charter is dealt now (turn 1).
-  if (S.bonusDraw) { for (let i = 0; i < S.bonusDraw; i++) { const x = drawOne(S); if (x && S.hand.length < 5) S.hand.push(x); } S.bonusDraw = 0; }
+  S.keep = S.hand.slice();
+  // A bonus draw bought by a Trade Charter joins the first fresh hand.
+  dealDraws(S, DRAW_PER_TURN + S.bonusDraw);
+  S.bonusDraw = 0;
   return S;
 }
 

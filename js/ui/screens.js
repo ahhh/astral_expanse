@@ -6,7 +6,7 @@ import { CLANS, CLAN_IDS, CARD_LIST, RARITY, TIER } from '../engine/cards.js';
 const allies = (cl) => CARD_LIST.filter((c) => c.cl === cl && c.ally).map((c) => c.ally);
 import { rubric, BANDS, HORIZON } from '../engine/rubric.js';
 import { STARTERS } from '../engine/mapgen.js';
-import { CARDS, FOUNDRY_LIST } from '../engine/cards.js';
+import { CARDS, FOUNDRY_LIST, COMPACT_LIST } from '../engine/cards.js';
 import { DIFFICULTY, MODIFIERS } from '../engine/expedition.js';
 import { TECHS, MEGA } from '../engine/colony.js';
 import { hashStr } from '../engine/rng.js';
@@ -100,6 +100,7 @@ export function codexScreen(root, { onBack }) {
     seg.append(h('button', { class: 'btn small' + (view === 'rubric' ? ' on' : ''), onclick: () => { view = 'rubric'; draw(); } }, '⚖️ Rubric'));
     seg.append(h('button', { class: 'btn small' + (view === 'foundry' ? ' on' : ''), onclick: () => { view = 'foundry'; draw(); } }, '🔧 Foundry'));
     seg.append(h('button', { class: 'btn small' + (view === 'systems' ? ' on' : ''), onclick: () => { view = 'systems'; draw(); } }, '🏗 Projects & tech'));
+    seg.append(h('button', { class: 'btn small' + (view === 'compacts' ? ' on' : ''), onclick: () => { view = 'compacts'; draw(); } }, '🤝 Compacts'));
     for (const id of CLAN_IDS) seg.append(h('button', { class: 'btn small' + (view === 'cards' && clan === id ? ' on' : ''), style: { color: CLANS[id].col }, onclick: () => { view = 'cards'; clan = id; draw(); } }, CLANS[id].ic, ' ', CLANS[id].n.split(' ')[0]));
     body.innerHTML = '';
     if (view === 'rubric') return rubricView(body);
@@ -108,6 +109,16 @@ export function codexScreen(root, { onBack }) {
       body.append(h('div', { class: 'list' }, Object.values(MEGA).map((m) => h('div', { class: 'item' }, h('h4', null, `${m.ic} ${m.n}`), h('div', { class: 'faint', style: { fontSize: '12px' } }, 'Requires: ' + m.req), h('div', { class: 'dim', style: { fontSize: '12px' } }, m.d)))));
       body.append(h('h3', { style: { marginTop: '16px' } }, 'Local technologies'), h('p', { class: 'dim' }, 'Each Influence checkpoint you meet (except the last) offers three; pick one. They vanish when the map ends.'));
       body.append(h('div', { class: 'list' }, Object.values(TECHS).map((t) => h('div', { class: 'item' }, h('h4', null, `${t.ic} ${t.n}`), h('div', { class: 'dim', style: { fontSize: '12px' } }, t.d)))));
+      return;
+    }
+    if (view === 'compacts') {
+      body.append(h('p', { class: 'dim', style: { marginTop: 0 } }, 'Clan Compacts: every pair of clans in a treaty upgrades one building in each clan into a version that feeds on the other. The upgrade replaces its base card in that clan\'s draw pool for the colony, so a full treaty of three carries six. Favors and Bans on the base card carry over.'));
+      for (const id of CLAN_IDS) {
+        body.append(h('div', { class: 'sect', style: { color: CLANS[id].col } }, `${CLANS[id].ic} ${CLANS[id].n}`));
+        body.append(h('div', { class: 'list' }, COMPACT_LIST.filter((c) => c.cl === id).map((c) => h('div', { class: 'item codex-card', onclick: () => sheet({ title: c.n, body: h('div', null, cardEl(c.id, { big: true })) }) },
+          h('div', null, h('b', null, c.n), ' ', h('span', { style: { color: CLANS[c.partner].col } }, `× ${CLANS[c.partner].ic} ${CLANS[c.partner].n.split(' ')[0]}`), h('div', { class: 'faint', style: { fontSize: '11px' } }, `Upgrades ${CARDS[c.base].n} · ${TIER[c.t]} ${RARITY[c.r].n}`), h('div', { class: 'tx dim', style: { fontSize: '12px' } }, cardText(c.text.slice(c.text.indexOf('Compact:'))))),
+          h('div', { style: { textAlign: 'right' } }, h('div', { class: 'faint', style: { fontSize: '10px' } }, `meas. ${MEASURED[c.id] ?? '–'}`))))));
+      }
       return;
     }
     if (view === 'foundry') {
@@ -177,7 +188,9 @@ export function helpScreen(root, { onBack }) {
       P('The asteroid rotates one quarter-turn each turn: the compass shows where the sun is. Lit hexes are brighter, Shadow hexes darker. Caverns (excavated rock) are always in Shadow.'),
       P('Natural deposits hold several units (shown as ×3, ×2). Converting one places the product on a free neighbouring hex, so keep space around your deposits.'),
       P('Meet each Influence checkpoint: every 5 turns and on the final turn, earn the target since the previous checkpoint (a miss never carries over). Missing one costs 3 Integrity; missing the final one fails the colony. Meeting one offers a local technology for the rest of the map. Arranging buildings into a mega-project (see Goals) scores a bonus and a lasting perk.'),
-      P('You draw 1 card per turn, +1 if two of your clans activated (or your only clan did), +1 more if all three did. Mid buildings unlock on turn 6 and Advanced on turn 11.'),
+      P('Every turn you draw 3 fresh cards from your clans\' pools (shaped by Presence, Favors and Bans). Build one; the fresh cards you leave are salvaged for +1 Influence each and go back to the pool. Your opening hand and cards returned to hand are 📌 Kept until you build them. Treaties draw more: +1 card after a turn where two of your clans activated, +2 when all three did. Mid buildings unlock on turn 6 and Advanced on turn 11.'),
+      P('Two clans carry a burden: 🧠 Synapse Overheat (a Synapse building that repeats another turns its hex Hot for 2 turns and cannot repeat until it cools) and 🏠 Hearthline Upkeep (every 3rd turn each Hearthline Habitat eats a Water, Biomass or Fuel within range 2; a hungry one costs 3 Influence).'),
+      P('You may build over a loose token (Metal, Biomass, Scrap…), which clears it; natural deposits block building. Clans trade: a building that uses a resource another clan made scores +1 (more with an Import bonus). Each pair of clans in your treaty also upgrades one building per clan into a 🤝 Compact card with a two-colour border that feeds on the partner clan.'),
       h('h3', null, 'Growing your treaty'),
       P('You set out with one clan. Clan Enclaves on the star chart invite their resident clan onto that map; secure the colony and the clan joins your treaty, up to three active clans. With a full treaty an enclave clan replaces one of yours for that map and is licensed for later swaps at Freeports.'),
       h('h3', null, 'Charters and the trade network'),

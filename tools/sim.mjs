@@ -8,7 +8,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import { writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { CLAN_IDS, CLANS, CARD_LIST, RARITY } from '../js/engine/cards.js';
+import { CLAN_IDS, CLANS, CARD_LIST, COMPACT_LIST, RARITY } from '../js/engine/cards.js';
 import { genColony } from '../js/engine/mapgen.js';
 import { playCard, bldList } from '../js/engine/colony.js';
 import { bestMove, tryAbilities, idleTurn } from '../js/engine/ai.js';
@@ -31,7 +31,7 @@ function playGame(clans, seed, profile, look) {
     if (m) playCard(S, m.i, m.k);
     else idleTurn(S);
   }
-  const blds = bldList(S).filter((b) => b.c !== 'beacon').map((b) => ({ c: b.c, inf: b.inf, ib: b.ib || 0, na: b.na || 0, turns: S.turn - b.placed + 1, placed: b.placed }));
+  const blds = bldList(S).filter((b) => b.c !== 'beacon').map((b) => ({ c: b.c, inf: b.inf, ib: b.ib || 0, na: b.na || 0, turns: S.turn - b.placed + 1, placed: b.placed, imps: b.imps || 0 }));
   return { clans, status: S.status, influence: S.influence, cps: S.checkpoints.map((c) => [c.need, c.met, c.at ?? S.influence]), cpInf: S.cpInf || [], blds, destroyed: S.stats.destroyed, integrity: S.integrity };
 }
 
@@ -81,14 +81,14 @@ function report(results, secs, jsonOut) {
   const obs = {};
   for (const r of results) for (const b of r.blds) {
     const o = (obs[b.c] = obs[b.c] || { n: 0, inf: 0, turns: 0, na: 0 });
-    o.n++; o.inf += b.inf; o.turns += b.turns; o.na += b.na; o.ib = (o.ib || 0) + b.ib;
+    o.n++; o.inf += b.inf; o.turns += b.turns; o.na += b.na; o.ib = (o.ib || 0) + b.ib; o.imps = (o.imps || 0) + b.imps;
   }
-  const rows = CARD_LIST.map((c) => {
+  const rows = CARD_LIST.concat(COMPACT_LIST).map((c) => {
     const o = obs[c.id] || { n: 0, inf: 0, turns: 0, na: 0 };
     const rb = rubric(c);
-    return { id: c.id, n: c.n, cl: c.cl, t: c.t, r: c.r, pp: rb.pp, placed: o.n, ipp: o.n ? o.inf / o.n : 0, ipt: o.turns ? o.inf / o.turns : 0, life: o.n ? o.turns / o.n : 0, apt: o.turns ? o.na / o.turns : 0, obs: o.n ? (o.ib || 0) / o.n + ((o.inf - (o.ib || 0)) / o.turns) * rb.H : 0 };
+    return { id: c.id, n: c.n, cl: c.cl, t: c.t, r: c.r, compact: !!c.compact, pp: rb.pp, placed: o.n, ipp: o.n ? o.inf / o.n : 0, ipt: o.turns ? o.inf / o.turns : 0, life: o.n ? o.turns / o.n : 0, apt: o.turns ? o.na / o.turns : 0, impRate: o.na ? (o.imps || 0) / o.na : 0, obs: o.n ? (o.ib || 0) / o.n + ((o.inf - (o.ib || 0)) / o.turns) * rb.H : 0 };
   });
-  const ok = rows.filter((x) => x.placed >= 4);
+  const ok = rows.filter((x) => x.placed >= 4 && !x.compact);
   const byR = {};
   for (const r of ok) (byR[r.r] = byR[r.r] || []).push(r.obs);
   console.log('\nObserved PP (Influence per turn on board × horizon) by rarity:', Object.entries(byR).map(([k, v]) => `${RARITY[k].n} ${avg(v).toFixed(1)} (n=${v.length})`).join(' · '));

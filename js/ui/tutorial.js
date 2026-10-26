@@ -213,7 +213,7 @@ const STEPS = [
   {
     where: 'colony', next: true, title: 'Your hand', target: () => [$('hand'), $('clans')],
     text: () => [P('Each card is a building from one of your clans (the chips above). The blue label is its trigger: ', h('b', null, 'On Build'), ' fires once, ', h('b', null, 'Every N turns'), ' repeats, ', h('b', null, 'Reactive'), ' fires when something happens nearby.'),
-      P('You draw 1 card per turn, +1 when your clans activate.')],
+      P('Each turn brings 3 fresh cards. The ones you don\'t build are salvaged for +1 each; 📌 Kept cards (like your starters) wait until you build them.')],
   },
   {
     where: 'colony', title: 'Move 1: build',

@@ -140,6 +140,11 @@ h1, h2, h3 { font-family: var(--head); margin: 0; letter-spacing: .02em; }
 .tx .pts { color: #ffd166; font-weight: 700; white-space: nowrap; }
 .card .rar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
 .card.big { flex: none; width: 100%; height: auto; cursor: default; }
+/* Clan Compact cards: a two-clan gradient border (own clan → partner clan). */
+.card.compact { border: 2px solid transparent; background: linear-gradient(180deg, var(--panel2), var(--panel)) padding-box, linear-gradient(135deg, var(--cc), var(--pc)) border-box; box-shadow: 0 0 10px -3px var(--pc); }
+.card.compact .art { border-top-color: transparent; border-image: linear-gradient(90deg, var(--cc), var(--pc)) 1; }
+.card.compact.sel { box-shadow: 0 0 0 2px var(--accent), 0 8px 26px -8px var(--pc); }
+.tag.compact-tag { background: linear-gradient(90deg, color-mix(in srgb, var(--cc) 45%, transparent), color-mix(in srgb, var(--pc) 45%, transparent)); color: #fff; }
 .card.big .tx { -webkit-mask-image: none; mask-image: none; font-size: 13px; }
 .card.big .tx .tl + .tl { margin-top: 6px; }
 .card.big .nm { font-size: 17px; padding-bottom: 6px; }

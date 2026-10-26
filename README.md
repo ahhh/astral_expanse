@@ -52,14 +52,16 @@ Every jump costs Cryo Isotopes (CY) and adds Frontier Pressure. If Pressure hits
 
 Each colony is a hex asteroid that you build up one card per turn.
 
-1. **Tap a card** in your hand. Every legal hex shows a forecast of the Influence it would earn, and the best three glow gold. Tap a hex, check the expected chain reaction, then press **Build here**. **💡 Hint** suggests a move. **↶ Undo** rewinds a misplaced building (if your difficulty allows it).
+1. **Tap a card** in your hand. You can build on any empty hex, including one holding a loose token your buildings made (Metal, Biomass, Scrap…), which clears it; natural deposits still block building. Every legal hex shows a forecast of the Influence it would earn, and the best three glow gold. Tap a hex, check the expected chain reaction, then press **Build here**. **💡 Hint** suggests a move. **↶ Undo** rewinds a misplaced building (if your difficulty allows it).
 2. **Chain reactions are the point.** Buildings fire On Build, on timers, while Sunlit, or in reaction to nearby events: a resource being created, consumed or melted, a hex heating up, a meteor landing, and so on. One well-placed card can set off a whole district. Each building activates at most twice per turn.
 3. **Spend a turn on the land.** Instead of building, tap a Rock hex next to open ground and **⛏ Excavate** it into a Cavern, or tap one of your buildings and **💥 Demolish** it to free the hex. Either uses your turn, triggers nearby reactions (excavate or destroy listeners) and you still draw normally.
 4. **Mind the light.** The asteroid turns a quarter each turn (see the sun compass). Solar buildings want Sunlit hexes and Cryo buildings want Shadow.
 5. **Hit the checkpoints.** Every 5 turns, and on the final turn, you must earn an Influence target. Each checkpoint counts only Influence earned since the previous one, so a miss never leaves you behind on the next; your total still counts toward Masterwork and the expedition score. Missing one costs 3 Integrity, and missing the final one fails the colony. Each checkpoint you meet (except the last) offers a **🔬 local technology** for the rest of that map, for example Overclock, Shield Grid or Supply Drones.
 6. **Go for mega-projects.** **🎯 Goals** tracks six arrangements, such as *Artificial Dawn* (Solar + Power network) and *Deep Biosphere* (connected Bio buildings on Pressurized ground). Completing one scores +12 and grants a lasting perk.
-7. **Draws.** You draw 1 card per turn, +1 if two of your clans activated last turn (or your only clan did), and +1 more if all three did.
+7. **Draws.** Every turn you draw 3 fresh cards, weighted by your Presence, Favors and Bans. Build one; the fresh cards you leave are salvaged for +1 Influence each and return to the pool. Your opening hand (starters and bought cards) and cards returned to hand by effects are 📌 Kept until you build them. Treaties draw more: +1 fresh card after a turn where two of your clans activated, +2 when all three did.
+9. **Trade and Clan Compacts.** Resources remember which clan made them: a building that uses another clan's token scores +1 (more on cards with an *Import* bonus). And every pair of clans in your treaty upgrades one building in each clan into a 🤝 **Compact** card (two-colour border) that feeds on the partner, for example Heliarch heat for an Ironwake bore or Kepler arrivals for a Cryostead comet hook. Compacts replace their base card in the draw pool, so a trio carries six. The Codex lists all 72.
 8. **Synergy cards.** Every clan has an Early Common and a Mid Uncommon marked 🔗 that feed on another clan's resources (Ironwake on Wreckborn Scrap and Heliarch heat, Heliarch on Cryostead ice and Synapse signals, Cryostead on Verdant biomass and Hearthline pressure, Verdant on Umbra anomalies and Ironwake caverns, Synapse on Hearthline habitats and Wreckborn salvage, Wreckborn on Kepler launches and Umbra radiation, Kepler on Ironwake metal and Cryostead ice, Hearthline on Kepler arrivals and Verdant biomass, Umbra on Heliarch heat and Synapse repeats). The links are one-way: no two clans feed on each other. Each works alone but is much stronger with its partner in the treaty.
+10. **Clan drawbacks.** Two clans carry a burden to manage. 🧠 **Synapse Overheat:** after a Synapse building repeats another building, its hex turns Hot for 2 turns and it cannot repeat again until it cools, so pair repeaters with coolers (Cryostead valves and fins, Umbra rifts) or let the heat feed Heat cards. 🏠 **Hearthline Upkeep:** every 3rd turn each Hearthline Habitat eats a Water, Biomass or Fuel within range 2; each hungry Habitat costs 3 Influence, so keep districts supplied (Cryostead, Verdant, Kepler arrivals).
 
 ### 4. Claim a charter
 
@@ -105,7 +107,7 @@ Each boss shows its stabilization objective before you commit. Win, and your end
 
 ### Tips for a first run
 
-- Take the first enclave. Two clans earn more draws and open cross-clan cascades.
+- Take the first enclave. Two clans widen every fresh hand and open cross-clan cascades.
 - Keep free hexes around multi-unit deposits: converters put their product next to the deposit.
 - Build your first lane early. A single Short Relay back to the Arkship pays for itself within a few jumps.
 - Watch Frontier Pressure. Lateral detours and failed colonies both cost extra.
@@ -133,6 +135,34 @@ node tools/expedition-smoke.mjs 3 [difficulty]       # bot plays whole expeditio
 ```
 
 The tools need Node 18+ (they share the game's engine modules; `package.json` only marks the folder as ES modules).
+
+### Simulation suites with full data
+
+`tools/simsuite.mjs` plays a suite and writes everything to `sim-out/<suite>-<timestamp>/` (git-ignored). The files are `games.jsonl` (one record per game: setup, result, checkpoints, engine stats, a per-turn log and every building), `summary.json` (cumulative stats overall, by treaty size, by clan, by treaty, per card and per tech) and `meta.json` (options and commit).
+
+```sh
+node tools/simsuite.mjs trios --games 4      # every three-clan treaty
+node tools/simsuite.mjs solo --games 60      # every clan alone
+node tools/simsuite.mjs treaty --games 100   # random 1-, 2- and 3-clan treaties
+node tools/simsuite.mjs boss --games 30      # the three planet bosses on finale maps
+node tools/simsuite.mjs tech --games 60      # each local technology vs. the same seed without it
+node tools/simsuite.mjs custom --clans iron,helio --games 40 --diff 1.16 --extra-events
+```
+
+Other suites: `duos`. Options: `--games --diff --turns --extra-events --seed --look --hexes --techs none|first|random --workers --no-turns --out DIR --quiet`.
+
+`tools/simsuite.py` drives it from Python (standard library; pandas optional):
+
+```python
+import sys; sys.path.insert(0, "tools")
+from simsuite import run, load
+
+r = run("solo", games=60)                 # or load("sim-out/solo-…")
+r.summary["byClan"]["iron"]["winRate"]    # cumulative stats
+r.group_by(lambda g: g["clans"])          # win rate / influence by clan
+r.buildings(); r.turns(); r.checkpoints(); r.cards()   # flat rows
+r.to_csv("turns", "turns.csv")            # or r.frame("turns") with pandas
+```
 
 ## Project layout
 
